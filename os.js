@@ -101,24 +101,26 @@ let wl;async function wake(){try{wl=await navigator.wakeLock.request('screen')}c
 document.addEventListener('visibilitychange',()=>document.visibilityState==='visible'&&wake());addEventListener('pointerdown',()=>{if(!wl||wl.released)wake()});wake();
 /* ---------- settings ---------- */
 function pickImg(cb,max){const i=document.createElement('input');i.type='file';i.accept='image/*';i.onchange=()=>{const f=i.files[0];if(!f)return;const im=new Image(),u=URL.createObjectURL(f);im.onload=()=>{const k=Math.min(1,max/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);cb(c.toDataURL('image/jpeg',.82))};im.src=u};i.click()}
-function cropAvatar(done){const i=document.createElement('input');i.type='file';i.accept='image/*';i.onchange=()=>{const f=i.files[0];if(!f)return;const im=new Image();im.onload=()=>edit(im);im.src=URL.createObjectURL(f)};i.click();
- function edit(im){const ov=H('div','crop',document.body),B=H('div','card cbox',ov,`<h3>Position your picture</h3><canvas width=300 height=300></canvas><input type=range min=1 max=4 step=.01 value=1><small>Drag to move · scroll or slide to zoom</small><div class=rw><button class=btn>Cancel</button><button class="btn pri">Save</button></div>`);
-  const cv=$('canvas',B),g=cv.getContext('2d'),z=$('input',B),R=130,base=Math.max(2*R/im.width,2*R/im.height);let k=1,x=150,y=150;
+function cropAvatar(host,done,cancel){const i=document.createElement('input');i.type='file';i.accept='image/*';i.onchange=()=>{const f=i.files[0];if(!f)return;const im=new Image();im.onload=()=>edit(im);im.src=URL.createObjectURL(f)};i.click();
+ function edit(im){host.innerHTML='';H('h3','',host).textContent='Position your picture';const B=H('div','card cbox',host,`<canvas width=300 height=300></canvas><div class=sl tabindex=0><div class=fill></div><div class=knob></div></div><small>Drag the picture to move · drag the bar or scroll to zoom</small><div class=rw><button class=btn>Cancel</button><button class="btn pri">Save</button></div>`);
+  const cv=$('canvas',B),g=cv.getContext('2d'),sl=$('.sl',B),R=130,base=Math.max(2*R/im.width,2*R/im.height);let k=1,x=150,y=150;
   const dim=()=>[im.width*base*k/2,im.height*base*k/2];
-  const draw=()=>{const[w,h]=dim();x=cl(x,150+R-w,150-R+w);y=cl(y,150+R-h,150-R+h);g.clearRect(0,0,300,300);g.drawImage(im,x-w,y-h,2*w,2*h);g.fillStyle='rgba(5,0,26,.72)';g.beginPath();g.rect(0,0,300,300);g.arc(150,150,R,0,7,true);g.fill('evenodd');g.strokeStyle='#fff';g.lineWidth=2;g.beginPath();g.arc(150,150,R,0,7);g.stroke()};
-  const zoom=n=>{n=cl(n,1,4);x=150+(x-150)*n/k;y=150+(y-150)*n/k;k=n;z.value=n;draw()};
+  const draw=()=>{const[w,h]=dim();x=cl(x,150+R-w,150-R+w);y=cl(y,150+R-h,150-R+h);g.clearRect(0,0,300,300);g.drawImage(im,x-w,y-h,2*w,2*h);g.fillStyle='rgba(5,0,26,.72)';g.beginPath();g.rect(0,0,300,300);g.moveTo(150+R,150);g.arc(150,150,R,0,Math.PI*2,true);g.fill('evenodd');g.strokeStyle='#fff';g.lineWidth=2;g.beginPath();g.arc(150,150,R,0,Math.PI*2);g.stroke()};
+  const zoom=n=>{n=cl(n,1,4);x=150+(x-150)*n/k;y=150+(y-150)*n/k;k=n;sl.style.setProperty('--v',(k-1)/3*100+'%');draw()};
   let d=null;cv.onpointerdown=e=>{cv.setPointerCapture(e.pointerId);d=[e.clientX,e.clientY]};cv.onpointerup=()=>d=null;
   cv.onpointermove=e=>{if(!d)return;const r=300/cv.getBoundingClientRect().width;x+=(e.clientX-d[0])*r;y+=(e.clientY-d[1])*r;d=[e.clientX,e.clientY];draw()};
-  cv.onwheel=e=>{e.preventDefault();zoom(k*(e.deltaY<0?1.06:.94))};z.oninput=()=>zoom(+z.value);
-  const[bc,bs]=B.querySelectorAll('button');bc.onclick=()=>ov.remove();
-  bs.onclick=()=>{const[w,h]=dim(),q=base*k,o=document.createElement('canvas');o.width=o.height=256;o.getContext('2d').drawImage(im,(150-R-(x-w))/q,(150-R-(y-h))/q,2*R/q,2*R/q,0,0,256,256);done(o.toDataURL('image/jpeg',.9));ov.remove()};draw()}}
+  cv.onwheel=e=>{e.preventDefault();zoom(k*(e.deltaY<0?1.06:.94))};
+  const at=e=>{const r=sl.getBoundingClientRect();zoom(1+3*cl((e.clientX-r.left)/r.width,0,1))};sl.onpointerdown=e=>{sl.setPointerCapture(e.pointerId);at(e);sl.onpointermove=at};sl.onpointerup=()=>sl.onpointermove=null;
+  sl.onkeydown=e=>{if(e.key==='ArrowRight'||e.key==='ArrowUp')zoom(k+.15);if(e.key==='ArrowLeft'||e.key==='ArrowDown')zoom(k-.15)};
+  const[bc,bs]=B.querySelectorAll('button');bc.onclick=cancel;
+  bs.onclick=()=>{const[w,h]=dim(),q=base*k,o=document.createElement('canvas');o.width=o.height=256;o.getContext('2d').drawImage(im,(150-R-(x-w))/q,(150-R-(y-h))/q,2*R/q,2*R/q,0,0,256,256);done(o.toDataURL('image/jpeg',.9))};zoom(1)}}
 function renderSettings(body,w){let tab=w.tab||'Personalization';w.setTab=t=>{tab=t;draw()};const draw=()=>{body.innerHTML=`<div class=app><div class=nav></div><div class=pane></div></div>`;const nv=$('.nav',body),pn=$('.pane',body);
  ['Personalization','Profiles','Taskbar','Time','System'].forEach(t=>{const b=H('button',t===tab?'on':'',nv,t);b.onclick=()=>{tab=t;draw()}});H('h3','',pn).textContent=tab;const card=(h)=>{const c=H('div','card',pn,h||'');return c},row=(c,l)=>{const r=H('div','rw',c);H('span','',r).textContent=l;return r};
  const ref=()=>{save();applyTheme();desk();draw()};
  if(tab==='Personalization'){const p=prof();[['Wallpaper','bg'],['Lock screen','lockbg']].forEach(([l,k])=>{const c=card(),r=row(c,l+' — '+p.name);if(p[k]){const im=H('div','',c);im.style.cssText=`height:90px;border-radius:8px;background:url(${p[k]}) center/cover`}const r2=H('div','rw',r);H('button','btn pri',r2,'Upload').onclick=()=>pickImg(d=>{p[k]=d;ref()},2560);H('button','btn',r2,'Default').onclick=()=>{p[k]=null;ref()}})}
  if(tab==='Profiles'){S.profiles.forEach(p=>{const c=card(),r=row(c,'');r.firstChild.remove();const a=av(p);a.style.cssText='width:48px;height:48px;flex:none';r.append(a);
   const n=H('input','in',r);n.value=p.name;n.onchange=()=>{p.name=n.value||'User';ref()};const pw=H('input','in',r);pw.placeholder=p.hash?'Password set (change)':'Set password (optional)';pw.type='password';pw.onchange=async()=>{await setPw(p,pw.value);ref()};
-  const r2=H('div','rw',c);H('button','btn',r2,'Upload picture').onclick=()=>cropAvatar(d=>{p.avatar=d;p.letters=false;ref()});H('button','btn',r2,p.letters?'Use picture':'Use letter').onclick=()=>{if(p.letters&&!p.avatar)return;p.letters=!p.letters;ref()};
+  const r2=H('div','rw',c);H('button','btn',r2,'Upload picture').onclick=()=>cropAvatar(pn,d=>{p.avatar=d;p.letters=false;ref()},draw);H('button','btn',r2,p.letters?'Use picture':'Use letter').onclick=()=>{if(p.letters&&!p.avatar)return;p.letters=!p.letters;ref()};
   if(p.hash)H('button','btn',r2,'Remove password').onclick=()=>{p.salt=p.hash='';ref()};if(S.profiles.length>1)H('button','btn dng',r2,'Delete').onclick=()=>{S.profiles=S.profiles.filter(x=>x!==p);if(S.cur===p.id)S.cur=S.profiles[0].id;ref()}});
   H('button','btn pri',pn,'+ Add profile').onclick=()=>{const id=Date.now();S.profiles.push({id,name:'User '+(S.profiles.length+1),avatar:null,letters:true,salt:'',hash:'',bg:null,lockbg:null});ref()}}
  if(tab==='Taskbar'){const c=card(),sel=(r,v,o,fn)=>{const q=H('select','in',r,o.map(x=>`<option value=${x[0]}>${x[1]}</option>`).join(''));q.value=v;q.onchange=()=>fn(q.value)},chk=(l,k)=>{const r=row(c,l),i=H('input','',r);i.type='checkbox';i.checked=S[k];i.onchange=()=>{S[k]=i.checked;ref()}};
@@ -136,14 +138,22 @@ function toast(m){const t=H('div','toast',document.body,m);setTimeout(()=>t.remo
 function openTo(tab){const w=W.find(x=>x.app==='settings');if(w){focusW(w);w.setTab&&w.setTab(tab)}else openApp('settings',{tab})}
 const grid=()=>{const A=area();return{x:A.x,y:A.y,c:Math.max(1,Math.floor((A.w-PAD*2)/CW)),r:Math.max(1,Math.floor((A.h-PAD*2)/CH))}};
 function freeCell(G,tk,c0,r0){let best=null,bd=1e9;for(let c=0;c<G.c;c++)for(let r=0;r<G.r;r++){if(tk.has(c+','+r))continue;const d=(c-c0)**2+(r-r0)**2;if(d<bd){bd=d;best=[c,r]}}return best}
-function desk(fit){const d=$('#desk'),G=grid(),tk=new Set();d.innerHTML='';S.desk.forEach(s=>s.dc=null);
+const selIds=new Set();let deskEls=[];
+const paintSel=()=>deskEls.forEach(i=>i.el.classList.toggle('sel',selIds.has(i.key)));
+function desk(fit){const d=$('#desk'),G=grid(),tk=new Set();d.innerHTML='';deskEls=[];S.desk.forEach(s=>s.dc=null);
  S.desk.forEach(s=>{let c=s.c,r=s.r;if((fit&&(c>=G.c||r>=G.r))||tk.has(c+','+r)){const f=freeCell(G,tk,Math.min(c,G.c-1),Math.min(r,G.r-1));if(!f)return;[c,r]=f;if(fit){s.c=c;s.r=r}}tk.add(c+','+r);s.dc=c;s.dr=r;
-  const a=APPS[s.app],nm=s.name||a.name,el=H('div','sc',d,`<img src="${IC(a.icon)}"><span></span>`);$('span',el).textContent=nm;el.style.left=G.x+PAD+c*CW+'px';el.style.top=G.y+PAD+r*CH+'px';
-  let st=null,mv=0,lt=0;el.ondblclick=()=>openApp(s.app);
-  el.onpointerdown=e=>{if(e.button)return;st=[e.clientX,e.clientY,el.offsetLeft,el.offsetTop];mv=0;el.setPointerCapture(e.pointerId)};
-  el.onpointermove=e=>{if(!st)return;const dx=e.clientX-st[0],dy=e.clientY-st[1];if(!mv&&Math.hypot(dx,dy)<6)return;mv=1;el.classList.add('drag');el.style.left=st[2]+dx+'px';el.style.top=st[3]+dy+'px'};
-  el.onpointerup=e=>{if(!st)return;st=null;if(mv){const tc=cl(Math.round((el.offsetLeft-G.x-PAD)/CW),0,G.c-1),tr=cl(Math.round((el.offsetTop-G.y-PAD)/CH),0,G.r-1),o=new Set();S.desk.forEach(x=>{if(x!==s&&x.dc!=null)o.add(x.dc+','+x.dr)});const f=o.has(tc+','+tr)?freeCell(G,o,tc,tr):[tc,tr];if(f){s.c=f[0];s.r=f[1];save()}desk()}else if(e.pointerType==='touch'){if(Date.now()-lt<400)openApp(s.app);lt=Date.now()}};
-  el.oncontextmenu=e=>{e.preventDefault();e.stopPropagation();ctx(e,[['Open',()=>openApp(s.app)],['Rename',()=>rename(el,s)],'sep',['Remove shortcut',()=>{S.desk=S.desk.filter(x=>x!==s);save();desk()}]])}})}
+  const a=APPS[s.app],nm=s.name||a.name,el=H('div','sc'+(selIds.has(s.id)?' sel':''),d,`<img src="${IC(a.icon)}"><span></span>`);$('span',el).textContent=nm;deskEls.push({key:s.id,el});el.style.left=G.x+PAD+c*CW+'px';el.style.top=G.y+PAD+r*CH+'px';
+  let st=null,mv=0,lt=0,gr=[];el.ondblclick=()=>openApp(s.app);
+  el.onpointerdown=e=>{if(e.button)return;st=[e.clientX,e.clientY];mv=0;el.setPointerCapture(e.pointerId)};
+  el.onpointermove=e=>{if(!st)return;const dx=e.clientX-st[0],dy=e.clientY-st[1];if(!mv){if(Math.hypot(dx,dy)<6)return;mv=1;gr=deskEls.filter(i=>i.el.classList.contains('sel')||i.el===el).map(i=>({e:i.el,l:i.el.offsetLeft,t:i.el.offsetTop}));gr.forEach(g=>g.e.classList.add('drag'))}gr.forEach(g=>{g.e.style.left=g.l+dx+'px';g.e.style.top=g.t+dy+'px'})};
+  el.onpointerup=e=>{if(!st)return;st=null;if(!mv){if(e.pointerType==='touch'){if(Date.now()-lt<400)openApp(s.app);lt=Date.now()}return}
+   const tc=cl(Math.round((el.offsetLeft-G.x-PAD)/CW),0,G.c-1),tr=cl(Math.round((el.offsetTop-G.y-PAD)/CH),0,G.r-1),grp=S.desk.filter(x=>(selIds.has(x.id)||x===s)&&x.dc!=null);
+   const dc=cl(tc-s.dc,-Math.min(...grp.map(x=>x.dc)),G.c-1-Math.max(...grp.map(x=>x.dc))),dr=cl(tr-s.dr,-Math.min(...grp.map(x=>x.dr)),G.r-1-Math.max(...grp.map(x=>x.dr)));
+   const oth=new Set(S.desk.filter(x=>!grp.includes(x)&&x.dc!=null).map(x=>x.dc+','+x.dr)),nt=grp.map(x=>[x,x.dc+dc,x.dr+dr]);
+   if(nt.every(([x,a,b])=>!oth.has(a+','+b)))nt.forEach(([x,a,b])=>{x.c=a;x.r=b});else if(grp.length===1){const f=freeCell(G,oth,tc,tr);if(f){s.c=f[0];s.r=f[1]}}
+   save();desk()};
+  el.oncontextmenu=e=>{e.preventDefault();e.stopPropagation();if(!selIds.has(s.id)){selIds.clear();selIds.add(s.id);paintSel()}const g=S.desk.filter(x=>selIds.has(x.id));
+   ctx(e,[['Open',()=>g.forEach(x=>openApp(x.app))],...(g.length===1?[['Rename',()=>rename(el,s)]]:[]),'sep',[g.length>1?'Remove shortcuts':'Remove shortcut',()=>{S.desk=S.desk.filter(x=>!selIds.has(x.id));selIds.clear();save();desk()}]])}})}
 function rename(el,s){const sp=$('span',el),i=document.createElement('input');i.className='in';i.value=s.name||APPS[s.app].name;sp.replaceWith(i);i.focus();i.select();let done=0;const fin=ok=>{if(done)return;done=1;if(ok){const v=i.value.trim();s.name=v&&v!==APPS[s.app].name?v:'';save()}desk()};i.onblur=()=>fin(1);i.onkeydown=e=>{e.stopPropagation();if(e.key==='Enter')fin(1);if(e.key==='Escape')fin(0)};i.onpointerdown=e=>e.stopPropagation()}
 function addDesk(app){const G=grid(),tk=new Set();S.desk.forEach(o=>o.dc!=null&&tk.add(o.dc+','+o.dr));for(let c=0;c<G.c;c++)for(let r=0;r<G.r;r++)if(!tk.has(c+','+r)){S.desk.push({id:Date.now(),app,name:'',c,r});save();desk();return toast('Added to desktop')}toast('Desktop is full')}
 let cx;const closeCtx=()=>{cx&&cx.remove();cx=null};
@@ -169,6 +179,18 @@ addEventListener('wheel',e=>{if(e.ctrlKey)e.preventDefault()},{passive:false});
 ['gesturestart','gesturechange','dragstart','auxclick','dblclick'].forEach(t=>addEventListener(t,e=>{if(t!=='dblclick'||e.target.closest('.tbar,.sc'))return t==='dblclick'?0:e.preventDefault();e.preventDefault()},{passive:false}));
 addEventListener('mousedown',e=>{if(e.button===1)e.preventDefault()});
 addEventListener('pointerdown',()=>{document.documentElement.requestFullscreen?.({navigationUI:'hide'}).then(()=>navigator.keyboard?.lock?.()).catch(()=>{})},{once:true});
+/* ---------- reusable multi-select (desktop now, File Explorer later) ---------- */
+function selectable(host,o){let anchor=null,pend=null,sx=0,sy=0,band=null,base=null;const sel=o.sel;
+ host.addEventListener('pointerdown',e=>{if(e.button!==0)return;sx=e.clientX;sy=e.clientY;const its=o.items(),hit=its.find(i=>i.el.contains(e.target)),add=e.ctrlKey||e.metaKey,rng=e.shiftKey;pend=null;
+  if(hit){if(rng&&anchor!=null){const a=its.findIndex(i=>i.key===anchor),b=its.indexOf(hit);if(!add)sel.clear();for(let k=Math.min(a,b);k<=Math.max(a,b);k++)sel.add(its[k].key)}
+   else if(add){sel.has(hit.key)?sel.delete(hit.key):sel.add(hit.key);anchor=hit.key}
+   else{if(sel.has(hit.key))pend=hit.key;else{sel.clear();sel.add(hit.key)}anchor=hit.key}o.change();return}
+  if(!add&&!rng)sel.clear();base=new Set(sel);band=H('div','band',document.body);host.setPointerCapture(e.pointerId);o.change()});
+ host.addEventListener('pointermove',e=>{if(!band)return;const x=Math.min(sx,e.clientX),y=Math.min(sy,e.clientY),w=Math.abs(e.clientX-sx),h=Math.abs(e.clientY-sy);Object.assign(band.style,{left:x+'px',top:y+'px',width:w+'px',height:h+'px'});
+  sel.clear();base.forEach(k=>sel.add(k));o.items().forEach(i=>{const r=i.el.getBoundingClientRect();if(r.left<x+w&&r.right>x&&r.top<y+h&&r.bottom>y)sel.add(i.key)});o.change()});
+ host.addEventListener('pointerup',e=>{if(band){band.remove();band=null}if(pend!=null&&Math.hypot(e.clientX-sx,e.clientY-sy)<6){sel.clear();sel.add(pend);o.change()}pend=null})}
+selectable($('#desk'),{items:()=>deskEls,sel:selIds,change:paintSel});
+addEventListener('keydown',e=>{if(e.key==='Tab')e.preventDefault()},true);
 /* ---------- browser lockdown ---------- */
 function immerse(){if(!S.immersive||document.fullscreenElement)return;try{const p=document.documentElement.requestFullscreen({navigationUI:'hide'});p&&p.then(()=>navigator.keyboard&&navigator.keyboard.lock(['KeyT','KeyW','KeyN','KeyR','KeyL','KeyD','KeyP','KeyS','KeyF','KeyU','KeyG','KeyH','KeyJ','KeyK','KeyO','KeyB','KeyE','Tab','F5','F6','F3'])).catch(()=>{})}catch{}}
 addEventListener('pointerdown',immerse);
