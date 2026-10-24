@@ -8,7 +8,12 @@ const bgv=d=>d?`url(${d})`:'linear-gradient(135deg,color-mix(in srgb,var(--a) 20
 const hash=async(pw,salt)=>{const d=new TextEncoder().encode(salt+'|'+pw);if(crypto.subtle){const b=await crypto.subtle.digest('SHA-256',d);return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}let h=5381;for(const c of d)h=(h*33^c)>>>0;return'f'+h};
 const setPw=async(p,v)=>{if(!v){p.salt=p.hash='';return}p.salt=[...crypto.getRandomValues(new Uint32Array(3))].join('-');p.hash=await hash(v,p.salt)};
 const factory=()=>{if(!confirm('Factory reset? This erases all profiles, passwords, wallpapers and settings.'))return;RZleave=1;try{DB.close()}catch{}localStorage.removeItem('rzos');const q=indexedDB.deleteDatabase('reitzel-os');q.onsuccess=q.onerror=q.onblocked=()=>location.reload()};
-const save=()=>{try{DB.transaction('kv','readwrite').objectStore('kv').put(S,'state')}catch(e){console.error(e)}};
+const PK=['theme','corners','glass','nodate','noanim','pos','size','conn','loose','mil'],DP={theme:0,corners:'rounded',glass:.5,nodate:false,noanim:false,pos:'bottom',size:'compact',conn:false,loose:false,mil:false};let PL=null;
+const save=()=>{try{const lp=S.profiles.find(p=>p.id===PL);if(lp)lp.prefs=Object.fromEntries(PK.map(k=>[k,S[k]]));DB.transaction('kv','readwrite').objectStore('kv').put(S,'state')}catch(e){console.error(e)}};
+function loadPrefs(id){const p=S.profiles.find(x=>x.id===id),q=(p&&p.prefs)||{};PK.forEach(k=>S[k]=q[k]!==undefined?q[k]:DP[k]);S.glass=[0,.25,.5,.75,1].reduce((a,b)=>Math.abs(b-S.glass)<Math.abs(a-S.glass)?b:a);PL=id}
+function switchTo(id){save();S.cur=id;loadPrefs(id);applyVars();save()}
+const nameTaken=(v,p)=>S.profiles.some(x=>x!==p&&x.name.trim().toLowerCase()===v.toLowerCase());
+const uniqueName=b=>{let n=2,v=b;while(nameTaken(v,null))v=b+' '+n++;return v};
 const prof=id=>S.profiles.find(p=>p.id===(id??S.cur))||S.profiles[0];
 const av=(p,c)=>{const e=H('div','av '+(c||''));if(p.avatar&&!p.letters){e.innerHTML=`<img class=av src="${p.avatar}">`}else e.textContent=(p.name||'?')[0].toUpperCase();return e};
 const X={min:'<svg viewBox="0 0 12 12"><path d="M2 6h8"/></svg>',max:'<svg viewBox="0 0 12 12"><rect x="2" y="2" width="8" height="8" rx="2"/></svg>',res:'<svg viewBox="0 0 12 12"><rect x="2" y="3.5" width="6.5" height="6.5" rx="1.5"/><path d="M4 3.5V2.5a1 1 0 011-1h4.500a1 1 0 011 1V7a1 1 0 01-1 1H8.500"/></svg>',x:'<svg viewBox="0 0 12 12"><path d="M2.500 2.500l7 7M9.500 2.500l-7 7"/></svg>'};
@@ -25,7 +30,7 @@ const APPS={files:{name:'File Explorer',icon:'folder',w:720,h:460,ctx:()=>[['New
  settings:{name:'Settings',icon:'compass-settings',w:820,h:540,render:renderSettings}};
 let W=[],zc=10,nid=1;
 /* ---------- windows ---------- */
-function openApp(id,opt){const a=APPS[id],A=area(),o=W.length%6*28;const el=H('div','win',$('#wins'));
+function openApp(id,opt){if(id==='files'&&!prof().admin)return toast('File Explorer requires an administrator');const a=APPS[id],A=area(),o=W.length%6*28;const el=H('div','win',$('#wins'));
  const w={id:nid++,app:id,el,min:false,max:false,prev:null,tab:opt&&opt.tab,sr:null};w.lockCursor=()=>{try{const q=$('.body',el).requestPointerLock();q&&q.catch&&q.catch(()=>{});tb.classList.remove('show');toast('Cursor locked — press Esc to release')}catch{}};W.push(w);
  const bw=Math.min(a.w,A.w-20),bh=Math.min(a.h,A.h-20);Object.assign(el.style,{width:bw+'px',height:bh+'px',left:A.x+Math.max(0,(A.w-bw)/2+o-60)+'px',top:A.y+Math.max(0,(A.h-bh)/2+o-40)+'px'});
  el.innerHTML=`<div class=tbar><img src="${IC(a.icon)}"><span>${a.name}</span><button class="wb m">${X.min}</button><button class="wb mx"><i class=ic>${X.max}</i><div class=snapm></div></button><button class="wb x">${X.x}</button></div><div class=body></div>`+['n','s','e','w','ne','nw','se','sw'].map(d=>`<div class="rz ${d}" data-d=${d}></div>`).join('');
@@ -86,7 +91,7 @@ function toggleStart(){if($('#start'))return closePop();closePop();const p=H('di
  const f=$('.foot',p),me=prof(),pb=H('button','',f);pb.style.cssText='display:flex;align-items:center;gap:10px;flex:1';pb.append(av(me));H('b','',pb).textContent=me.name;
  const menu=(items,side)=>{const ex=p.querySelector('.pm');ex&&ex.remove();if(ex&&ex.dataset.k===side)return;const m=H('div','pop pm',f);m.dataset.k=side;m.style.cssText='position:absolute;bottom:56px;'+side+':0';items.forEach(([n,fn,a])=>{const b=H('button','',m);if(a)b.append(a);b.append(n);b.onclick=fn})};
  const pw=H('button','btn',f,'⏻');pw.onclick=()=>menu([['Sign out',lockNow],['Restart',()=>{RZleave=1;sessionStorage.setItem('rz-restart',1);location.reload()}],['Power off',powerOff]],'right');
- pb.onclick=()=>menu(S.profiles.map(x=>[x.name,()=>{S.cur=x.id;save();lockNow()},av(x)]),'left')}
+ pb.onclick=()=>menu(S.profiles.map(x=>[x.name,()=>{switchTo(x.id);lockNow()},av(x)]),'left')}
 addEventListener('click',e=>{if(!e.target.closest('.pop,.ctx'))closePop()});
 /* ---------- desktop ---------- */
 /* ---------- lock ---------- */
@@ -99,12 +104,19 @@ function lockNow(keep){closePop();L.className='';const p=prof();L.style.setPrope
  const go=H('button','go',w,'→');const enter=async()=>{if(p.hash&&(await hash(inp.value,p.salt))!==p.hash){w.classList.remove('shake');void w.offsetWidth;w.classList.add('shake');inp.value='';return}L.classList.add('hide');c.remove();startIdle();applyTheme();desk()};
  go.onclick=enter;if(inp)inp.onkeydown=e=>{if(e.key==='Enter')enter()};
  const bub=H('button','lbub',lg,`<img src="${IC('reitzel')}">`);
- bub.onclick=e=>{e.stopPropagation();const ex=$('.lmenu',lg);if(ex)return ex.remove();const m=H('div','lmenu',lg);S.profiles.forEach(x=>{const b=H('button',x.id===p.id?'on':'',m);b.append(av(x));H('span','',b).textContent=x.name;b.onclick=()=>{S.cur=x.id;save();lockNow(true)}})};
+ bub.onclick=e=>{e.stopPropagation();const ex=$('.lmenu',lg);if(ex)return ex.remove();const m=H('div','lmenu',lg);S.profiles.forEach(x=>{const b=H('button',x.id===p.id?'on':'',m);b.append(av(x));H('span','',b).textContent=x.name;b.onclick=()=>{switchTo(x.id);lockNow(true)}})};
  lg.addEventListener('pointerdown',e=>{if(!e.target.closest('.lmenu,.lbub')){const m=$('.lmenu',lg);m&&m.remove()}});
  if(keep){c.style.transition='none';c.classList.add('up');if(inp)setTimeout(()=>inp.focus(),50)}
  c.onclick=()=>{c.classList.add('up');if(inp){setTimeout(()=>inp.focus(),120);c.addEventListener('transitionend',()=>inp.focus(),{once:true})}if(!p.hash)go.focus()};
  if(sessionStorage.getItem('rz-restart')){sessionStorage.removeItem('rz-restart')}}
 function startIdle(){const r=()=>{clearTimeout(idle);idle=setTimeout(()=>{if(L.classList.contains('hide'))lockNow()},120000)};['pointerdown','keydown','pointermove'].forEach(e=>addEventListener(e,r));r()}
+function shutdownThen(next){closePop();clearTimeout(idle);const o=$('#off');o.onclick=null;o.style.display='grid';o.textContent='Shutting down…';W.forEach(w=>w.el.remove());W=[];setTimeout(()=>{o.style.display='none';next()},1400)}
+function delProfile(p){const self=p.id===S.cur;if(!confirm('Delete profile "'+p.name+'"?'+(self?' You will be signed out.':'')))return false;
+ S.profiles=S.profiles.filter(x=>x!==p);if(S.profiles.length&&!S.profiles.some(x=>x.admin))S.profiles[0].admin=true;if(!self){save();return true}
+ if(S.profiles.length){S.cur=S.profiles[0].id;loadPrefs(S.cur)}save();shutdownThen(()=>S.profiles.length?lockNow():setupProfile());return false}
+function setupProfile(){closePop();L.className='';L.style.setProperty('--bg',bgv(null));L.innerHTML='<div class=lbg></div><div class=login><h2>Create your profile</h2><small style="opacity:.7">The first profile is the administrator</small><div class=pw><input class=sn placeholder="Name" maxlength=24></div><div class=pw><input class=sp type=password placeholder="Password (optional)"></div><button class="btn pri go2">Create</button></div>';
+ const nm=$('.sn',L),pw=$('.sp',L),go=async()=>{const v=nm.value.trim();if(!v){nm.focus();return}const p={id:Date.now(),name:v,avatar:null,letters:true,salt:'',hash:'',bg:null,lockbg:null,admin:true};await setPw(p,pw.value);S.profiles=[p];S.cur=p.id;loadPrefs(p.id);applyVars();save();lockNow()};
+ $('.go2',L).onclick=go;[nm,pw].forEach(i=>i.onkeydown=e=>{if(e.key==='Enter')go()});setTimeout(()=>nm.focus(),50)}
 function powerOff(){closePop();const o=$('#off');o.style.display='grid';o.textContent='Click to power on';W.forEach(w=>w.el.remove());W=[];o.onclick=()=>{o.style.display='none';lockNow()};lockNow()}
 /* ---------- wake lock ---------- */
 let wl;async function wake(){try{wl=await navigator.wakeLock.request('screen')}catch{}}
@@ -133,16 +145,18 @@ function renderSettings(body,w){let tab=w.tab||'Personalization';w.setTab=t=>{ta
  seg(row(card(),'Glass opacity (taskbar & menus)'),S.glass,[[0,'Clear'],[.25,'Light'],[.5,'Default'],[.75,'Rich'],[1,'Solid']],v=>{S.glass=v;ref()});
  const tg=(l,get,set)=>{const r=row(card(),l),i=H('input','',r);i.type='checkbox';i.checked=get();i.onchange=()=>{set(i.checked);ref()}};
  tg('Show date on taskbar',()=>!S.nodate,v=>S.nodate=!v);tg('Reduce animations',()=>!!S.noanim,v=>S.noanim=v)}
- if(tab==='Profiles'){S.profiles.forEach(p=>{const c=card(),r=row(c,'');r.firstChild.remove();const a=av(p);a.style.cssText='width:48px;height:48px;flex:none';r.append(a);
-  const n=H('input','in',r);n.value=p.name;n.onchange=()=>{p.name=n.value||'User';ref()};const pw=H('input','in',r);pw.placeholder=p.hash?'Password set (change)':'Set password (optional)';pw.type='password';pw.onchange=async()=>{await setPw(p,pw.value);ref()};
-  const r2=H('div','rw',c);H('button','btn',r2,'Upload picture').onclick=()=>cropAvatar(pn,d=>{p.avatar=d;p.letters=false;ref()},draw);H('button','btn',r2,p.letters?'Use picture':'Use letter').onclick=()=>{if(p.letters&&!p.avatar)return;p.letters=!p.letters;ref()};
-  if(p.hash)H('button','btn',r2,'Remove password').onclick=()=>{p.salt=p.hash='';ref()};if(S.profiles.length>1)H('button','btn dng',r2,'Delete').onclick=()=>{S.profiles=S.profiles.filter(x=>x!==p);if(S.cur===p.id)S.cur=S.profiles[0].id;ref()}});
-  H('button','btn pri',pn,'+ Add profile').onclick=()=>{const id=Date.now();S.profiles.push({id,name:'User '+(S.profiles.length+1),avatar:null,letters:true,salt:'',hash:'',bg:null,lockbg:null});ref()}}
+ if(tab==='Profiles'){const me=prof(),adm=!!me.admin;S.profiles.filter(p=>adm||p===me).forEach(p=>{const c=card(),r=row(c,'');r.firstChild.remove();const a=av(p);a.style.cssText='width:48px;height:48px;flex:none';r.append(a);
+   const n=H('input','in',r);n.value=p.name;n.onchange=()=>{const v=n.value.trim()||'User';if(nameTaken(v,p)){toast('That name is already used by another profile');n.value=p.name;return}p.name=v;ref()};
+   const pw=H('input','in',r);pw.placeholder=p.hash?'Password set (change)':'Set password (optional)';pw.type='password';pw.onchange=async()=>{await setPw(p,pw.value);ref()};
+   const r2=H('div','rw',c);H('button','btn',r2,'Upload picture').onclick=()=>cropAvatar(pn,d=>{p.avatar=d;p.letters=false;ref()},draw);H('button','btn',r2,p.letters?'Use picture':'Use letter').onclick=()=>{if(p.letters&&!p.avatar)return;p.letters=!p.letters;ref()};
+   if(p.hash)H('button','btn',r2,'Remove password').onclick=()=>{p.salt=p.hash='';ref()};
+   if(adm){const r3=row(c,'Administrator'),i=H('input','',r3);i.type='checkbox';i.checked=!!p.admin;i.onchange=()=>{if(!i.checked&&S.profiles.filter(x=>x.admin).length<2){toast('At least one administrator is required');i.checked=true;return}p.admin=i.checked;ref()};H('button','btn dng',r2,'Delete').onclick=()=>{if(delProfile(p))ref()}}});
+  if(adm)H('button','btn pri',pn,'+ Add profile').onclick=()=>{S.profiles.push({id:Date.now(),name:uniqueName('User'),avatar:null,letters:true,salt:'',hash:'',bg:null,lockbg:null,admin:false});ref()};else H('small','',pn,'Only administrators can add, remove or promote profiles.').style.opacity=.6}
  if(tab==='Taskbar'){const c=card(),sel=(r,v,o,fn)=>seg(r,v,o,fn),chk=(l,k)=>{const r=row(c,l),i=H('input','',r);i.type='checkbox';i.checked=S[k];i.onchange=()=>{S[k]=i.checked;ref()}};
   sel(row(c,'Position'),S.pos,[['bottom','Bottom'],['left','Left'],['right','Right']],v=>{S.pos=v;ref()});sel(row(c,'Size'),S.size,[['compact','Compact'],['roomy','Roomy'],['luxurious','Luxurious']],v=>{S.size=v;ref()});
   chk('Connected taskbar (flush with the screen edge)','conn');chk('Loose taskbar (hidden until you move to its edge; overlays apps)','loose')}
  if(tab==='Time'){const c=card(),r=row(c,'24-hour (military) clock');const k=H('input','',r);k.type='checkbox';k.checked=S.mil;k.onchange=()=>{S.mil=k.checked;ref()}}
- if(tab==='System'){const c0=card(),r0=row(c0,'Immersive mode (fullscreen + capture browser shortcuts)'),k0=H('input','',r0);k0.type='checkbox';k0.checked=S.immersive;k0.onchange=()=>{S.immersive=k0.checked;save();if(k0.checked)immerse();else{document.fullscreenElement&&document.exitFullscreen();navigator.keyboard&&navigator.keyboard.unlock&&navigator.keyboard.unlock()}};const c=card(),r=row(c,'Factory reset — erases all profiles, passwords and settings');H('button','btn dng',r,'Reset').onclick=()=>{factory()}}};draw()}
+ if(tab==='System'){const c0=card(),r0=row(c0,'Immersive mode (fullscreen + capture browser shortcuts)'),k0=H('input','',r0);k0.type='checkbox';k0.checked=S.immersive;k0.onchange=()=>{S.immersive=k0.checked;save();if(k0.checked)immerse();else{document.fullscreenElement&&document.exitFullscreen();kunlock()}};if(prof().admin){const c=card(),r=row(c,'Factory reset — erases all profiles, passwords and settings');H('button','btn dng',r,'Reset').onclick=()=>{factory()}}}};draw()}
 /* ---------- layout, desktop, context menus ---------- */
 const TBH=()=>({compact:38,roomy:48,luxurious:66})[S.size],thick=()=>TBH()+(S.conn?0:16),CW=84,CH=92,PAD=14;
 function area(){const T=thick();let x=0,y=0,w=innerWidth,h=innerHeight;if(!S.loose){if(S.pos==='bottom')h-=T;else{w-=T;if(S.pos==='left')x=T}}return{x,y,w,h}}
@@ -209,10 +223,10 @@ addEventListener('pointerdown',e=>{if(selIds.size&&e.target.closest('.win,#tb,.p
 addEventListener('keydown',e=>{if(e.key==='Tab')e.preventDefault()},true);
 /* ---------- browser lockdown ---------- */
 const KL=['KeyT','KeyW','KeyN','Tab','F5','F6'];
-function klock(){try{navigator.keyboard&&navigator.keyboard.lock(KL).catch(()=>{})}catch{}}
-function immerse(){if(!S.immersive||document.fullscreenElement)return;try{const p=document.documentElement.requestFullscreen({navigationUI:'hide'});p&&p.then(klock).catch(()=>{})}catch{}}
-document.addEventListener('focusin',e=>{if(e.target.closest&&e.target.closest('input,textarea')){try{navigator.keyboard&&navigator.keyboard.unlock()}catch{}}});
-document.addEventListener('focusout',e=>{if(S.immersive&&document.fullscreenElement&&e.target.closest&&e.target.closest('input,textarea'))klock()});
+let kl=0;function klock(){if(kl)return;kl=1;try{navigator.keyboard&&navigator.keyboard.lock(KL).catch(()=>{kl=0})}catch{kl=0}}
+function kunlock(){kl=0;try{navigator.keyboard&&navigator.keyboard.unlock()}catch{}}
+document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement)kl=0});
+function immerse(){if(!S.immersive)return;if(document.fullscreenElement)return klock();try{const p=document.documentElement.requestFullscreen({navigationUI:'hide'});p&&p.then(klock).catch(()=>{})}catch{}}
 addEventListener('click',e=>{if(!e.target.closest('input,textarea'))immerse()});
 addEventListener('keydown',e=>{const k=e.key.toLowerCase(),m=e.ctrlKey||e.metaKey;if(m&&((k.length===1&&'swprfdulgehkjbo+-=0'.includes(k))||/^(tab|pageup|pagedown|[1-9])$/.test(k)))e.preventDefault();if(/^F([1-9]|10)$/.test(e.key)||(e.altKey&&/^Arrow(Left|Right)$/.test(e.key)))e.preventDefault()},true);
 addEventListener('wheel',e=>{if(e.ctrlKey)e.preventDefault()},{passive:false});
@@ -222,5 +236,5 @@ addEventListener('mousedown',e=>{if(e.button===1)e.preventDefault()});
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 (async()=>{try{DB=await idb();let s=await load();if(!s)try{s=JSON.parse(localStorage.getItem('rzos'))}catch{}
  if(s){S=s;if(S.bg){S.profiles[0].bg=S.bg;delete S.bg}for(const p of S.profiles)if(p.pw){await setPw(p,p.pw);delete p.pw}save();localStorage.removeItem('rzos')}}catch(e){console.error(e)}
- S.pins??=['files','settings'];S.desk??=[{id:1,app:'files',c:0,r:0},{id:2,app:'settings',c:0,r:1}];S.pos??='bottom';S.loose??=false;S.immersive??=true;S.theme??=0;S.corners??='rounded';S.glass??=.5;S.glass=[0,.25,.5,.75,1].reduce((a,b)=>Math.abs(b-S.glass)<Math.abs(a-S.glass)?b:a);addEventListener('resize',()=>{closePop();renderTB();refit(1)});addEventListener('keydown',e=>{if(!L.classList.contains('hide')&&e.ctrlKey&&e.altKey&&e.shiftKey&&e.code==='KeyX'){e.preventDefault();factory()}});
- applyTheme();desk();lockNow()})();
+ S.pins??=['files','settings'];S.desk??=[{id:1,app:'files',c:0,r:0},{id:2,app:'settings',c:0,r:1}];S.pos??='bottom';S.loose??=false;S.immersive??=true;S.theme??=0;S.corners??='rounded';S.glass??=.5;if(!S.mig){const lg=Object.fromEntries(PK.map(k=>[k,S[k]!==undefined?S[k]:DP[k]]));S.profiles.forEach(p=>{if(!p.prefs)p.prefs={...lg}});S.mig=1}if(S.profiles.length&&!S.profiles.some(p=>p.admin))S.profiles[0].admin=true;if(S.profiles.length)loadPrefs(S.cur);addEventListener('resize',()=>{closePop();renderTB();refit(1)});addEventListener('keydown',e=>{if(!L.classList.contains('hide')&&e.ctrlKey&&e.altKey&&e.shiftKey&&e.code==='KeyX'){e.preventDefault();factory()}});
+ if(S.profiles.length){applyTheme();desk();lockNow()}else{desk();setupProfile()}})();
