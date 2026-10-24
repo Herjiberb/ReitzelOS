@@ -98,3 +98,7 @@ body.noanim *{transition:none!important;animation:none!important}#tb.nodate .dt{
 .lmenu{position:absolute;right:28px;bottom:92px;min-width:230px;padding:6px;border-radius:16px;background:var(--glass);backdrop-filter:blur(30px) saturate(170%);border:1px solid #ffffff1a;box-shadow:0 10px 40px #000a;animation:up .14s}
 .lmenu button{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border-radius:10px;text-align:left}.lmenu button:hover{background:#ffffff1c}.lmenu button.on{background:linear-gradient(90deg,color-mix(in srgb,var(--a) 55%,transparent),color-mix(in srgb,var(--b) 35%,transparent))}
 .lmenu .av{width:30px;height:30px;font-size:14px;flex:none}
+
+.pm{background:color-mix(in srgb,color-mix(in srgb,var(--a) 22%,#06030f) 95%,transparent)!important;backdrop-filter:blur(30px) saturate(160%)!important;-webkit-backdrop-filter:blur(30px) saturate(160%)!important;box-shadow:0 10px 40px #000c}
+.pm button,.pm .row{color:#fff;font-weight:500}.pm .av{box-shadow:0 0 0 2px #ffffff33}.foot .btn{background:#ffffff22}
+.go2{padding:10px 26px;border-radius:999px;margin-top:6px}
