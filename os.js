@@ -48,7 +48,7 @@ function genie(w,rev){if(S.noanim){if(!rev&&w.min)w.el.classList.add('min');retu
   kf.push({clipPath:`polygon(${L.concat(Q).join(',')})`,transform:`translate(${dx*sb}px,${dy*eo}px) scaleY(${1-.96*eo})`,opacity:t>.88?(1-t)/.12:1})}
  w.a&&w.a.cancel();e.classList.add('gen');const a=w.a=e.animate(rev?kf.reverse():kf,{duration:rev?460:520,easing:'linear',fill:'both'});
  a.onfinish=()=>{e.classList.remove('gen');if(!rev&&w.min)e.classList.add('min');a.cancel()}}
-function closeW(w){if(w.beforeClose&&w.beforeClose()&&!w.force&&!confirm("Close with unsaved changes?"))return;w.el.classList.add('closing');W=W.filter(x=>x!==w);setTimeout(()=>w.el.remove(),200);renderTB()}
+function closeW(w){if(w.beforeClose&&w.beforeClose()&&!w.force&&!confirm("Close with unsaved changes?"))return;w.onclose&&w.onclose();w.el.classList.add('closing');W=W.filter(x=>x!==w);setTimeout(()=>w.el.remove(),200);renderTB()}
 function toggleMax(w){const e=w.el,A=area();if(w.max){Object.assign(e.style,w.prev);w.max=false;e.classList.remove('max')}else{w.prev={left:e.style.left,top:e.style.top,width:e.style.width,height:e.style.height};Object.assign(e.style,{left:A.x+'px',top:A.y+'px',width:A.w+'px',height:A.h+'px'});w.sr=null;w.max=true;e.classList.add('max')}
  $('.ic',e).innerHTML=w.max?X.res:X.max;e.classList.add('snap');setTimeout(()=>e.classList.remove('snap'),200);focusW(w)}
 function snap(w,r){const A=area(),e=w.el;if(w.max){w.max=false;e.classList.remove('max');$('.ic',e).innerHTML=X.max}e.classList.add('snap');
@@ -62,7 +62,7 @@ function resize(w){w.el.querySelectorAll('.rz').forEach(r=>r.onpointerdown=e=>{e
  if(d.includes('w')){const nw=Math.max(mw,s.w-dx);el.style.width=nw+'px';el.style.left=s.l+s.w-nw+'px'}if(d.includes('n')){const A=area(),nt=Math.max(A.y,Math.min(s.t+dy,s.t+s.h-mh));el.style.height=s.t+s.h-nt+'px';el.style.top=nt+'px'}};r.onpointerup=()=>r.onpointermove=null})}
 /* ---------- taskbar ---------- */
 const tb=$('#tb');
-function renderTB(){const V=S.pos!=='bottom',run=[];W.forEach(w=>{if(!S.pins.includes(w.app)&&!run.includes(w.app))run.push(w.app)});tb.innerHTML='';
+function renderTB(){const V=S.pos!=='bottom',run=[];W.forEach(w=>{if(!w.temp&&!S.pins.includes(w.app)&&!run.includes(w.app))run.push(w.app)});tb.innerHTML='';
  const s=H('button','tbb',tb,`<img src="${IC('reitzel')}">`);s.onclick=e=>{e.stopPropagation();toggleStart()};
  const box=H('div','apps',tb),sz=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--ico'))+14,A=S.pins.concat(run).filter(k=>APPS[k]),room=V?innerHeight-260-sz*2:innerWidth-(S.conn?60:90)-330-sz*2,fit=Math.max(1,Math.floor(room/sz)),vis=A.length>fit?A.slice(0,fit-1):A,rest=A.slice(vis.length);
  const btn=(id,p)=>{const ws=W.filter(w=>w.app===id),b=H('button','tbb'+(ws.length?' run':'')+(ws.length>1?' multi':'')+(ws.some(w=>w.el.classList.contains('foc'))?' act':''),p,`<img src="${IC(APPS[id].icon)}">`);b.dataset.app=id;
@@ -86,7 +86,7 @@ function miniBar(rest,a,btn){closePop();const p=H('div','pop prev',pop);const sc
  if(rest.length>per){const l=H('button','tbb',p,'‹'),r=H('button','tbb',null,'›');p.append(sc,r);l.onclick=()=>{off=Math.max(0,off-per);draw()};r.onclick=()=>{off=Math.min(rest.length-1,off+per);draw()}}else p.append(sc);draw();place(p,a)}
 function toggleStart(){if($('#start'))return closePop();closePop();const p=H('div','pop',pop);p.id='start';startPos(p);
  p.innerHTML=`<input class=srch placeholder="Search apps" autofocus><div class=grid></div><div class=foot></div>`;p.onclick=e=>{e.stopPropagation();if(!e.target.closest('.pm,.foot>button'))p.querySelector('.pm')?.remove()};
- const g=$('.grid',p),draw=q=>{g.innerHTML='';Object.keys(APPS).filter(k=>APPS[k].name.toLowerCase().includes(q.toLowerCase())).forEach(k=>{const i=H('button','gi',g,`<img src="${IC(APPS[k].icon)}">${APPS[k].name}`);i.onclick=()=>{closePop();openApp(k)};i.oncontextmenu=e=>{e.preventDefault();e.stopPropagation();const pn=S.pins.includes(k);ctx(e,[['Open',()=>{closePop();openApp(k)}],'sep',['Add to desktop',()=>addDesk(k)],[pn?'Unpin from taskbar':'Pin to taskbar',()=>pn?unpin(k):pin(k)]])}})};draw('');
+ const g=$('.grid',p),draw=q=>{g.innerHTML='';Object.keys(APPS).filter(k=>!APPS[k].hide&&APPS[k].name.toLowerCase().includes(q.toLowerCase())).forEach(k=>{const i=H('button','gi',g,`<img src="${IC(APPS[k].icon)}">${APPS[k].name}`);i.onclick=()=>{closePop();openApp(k)};i.oncontextmenu=e=>{e.preventDefault();e.stopPropagation();const pn=S.pins.includes(k);ctx(e,[['Open',()=>{closePop();openApp(k)}],'sep',['Add to desktop',()=>addDesk(k)],[pn?'Unpin from taskbar':'Pin to taskbar',()=>pn?unpin(k):pin(k)]])}})};draw('');
  $('.srch',p).oninput=e=>draw(e.target.value);setTimeout(()=>$('.srch',p).focus(),30);
  const f=$('.foot',p),me=prof(),pb=H('button','',f);pb.style.cssText='display:flex;align-items:center;gap:10px;flex:1';pb.append(av(me));H('b','',pb).textContent=me.name;
  const menu=(items,side)=>{const ex=p.querySelector('.pm');ex&&ex.remove();if(ex&&ex.dataset.k===side)return;const m=H('div','pop pm',f);m.dataset.k=side;m.style.cssText='position:absolute;bottom:56px;'+side+':0';items.forEach(([n,fn,a])=>{const b=H('button','',m);if(a)b.append(a);b.append(n);b.onclick=fn})};
