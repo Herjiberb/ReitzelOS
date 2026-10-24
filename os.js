@@ -31,8 +31,8 @@ function openApp(id){const a=APPS[id],A=area(),o=W.length%6*28;const el=H('div',
  $('.tbar',el).ondblclick=e=>{if(!e.target.closest('button'))toggleMax(w)};
  el.onpointerdown=()=>focusW(w);drag(w);resize(w);a.render($('.body',el),w);focusW(w);renderTB();return w}
 function focusW(w){w.min=false;w.el.classList.remove('min');w.el.style.zIndex=++zc;W.forEach(x=>x.el.classList.toggle('foc',x===w));renderTB()}
-function minim(w){w.min=true;w.el.classList.add('min');W.forEach(x=>x.el.classList.remove('foc'));renderTB()}
-function closeW(w){w.el.remove();W=W.filter(x=>x!==w);renderTB()}
+function minim(w){const e=w.el,b=$(`#tb [data-app="${w.app}"]`);if(b){const r=b.getBoundingClientRect();e.style.setProperty('--tx',r.left+r.width/2-(e.offsetLeft+e.offsetWidth/2)+'px');e.style.setProperty('--ty',r.top+r.height/2-(e.offsetTop+e.offsetHeight/2)+'px')}w.min=true;e.classList.add('min');W.forEach(x=>x.el.classList.remove('foc'));renderTB()}
+function closeW(w){w.el.classList.add('closing');W=W.filter(x=>x!==w);setTimeout(()=>w.el.remove(),200);renderTB()}
 function toggleMax(w){const e=w.el,A=area();if(w.max){Object.assign(e.style,w.prev);w.max=false;e.classList.remove('max')}else{w.prev={left:e.style.left,top:e.style.top,width:e.style.width,height:e.style.height};Object.assign(e.style,{left:0,top:0,width:A.w+'px',height:innerHeight+'px'});w.max=true;e.classList.add('max')}
  $('.ic',e).innerHTML=w.max?X.res:X.max;e.classList.add('snap');setTimeout(()=>e.classList.remove('snap'),200);focusW(w)}
 function snap(w,r){const A=area(),e=w.el;if(w.max){w.max=false;e.classList.remove('max');$('.ic',e).innerHTML=X.max}e.classList.add('snap');
@@ -50,13 +50,13 @@ function renderTB(){const A=[...pinned];W.forEach(w=>{if(!A.includes(w.app))A.pu
  const s=H('button','tbb',tb,`<img src="${IC('reitzel')}">`);s.onclick=e=>{e.stopPropagation();toggleStart()};
  const box=H('div','apps',tb);const sz=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--ico'))+14;
  const fit=Math.max(1,Math.floor((innerWidth-(S.conn?60:90)-330-sz*2)/sz)),vis=A.length>fit?A.slice(0,fit-1):A,rest=A.slice(vis.length);
- const btn=(id,p)=>{const ws=W.filter(w=>w.app===id),b=H('button','tbb'+(ws.length?' run':'')+(ws.some(w=>w.el.classList.contains('foc'))?' act':''),p,`<img src="${IC(APPS[id].icon)}">`);b.title=APPS[id].name;
+ const btn=(id,p)=>{const ws=W.filter(w=>w.app===id),b=H('button','tbb'+(ws.length?' run':'')+(ws.some(w=>w.el.classList.contains('foc'))?' act':''),p,`<img src="${IC(APPS[id].icon)}">`);b.title=APPS[id].name;b.dataset.app=id;
   b.onclick=e=>{e.stopPropagation();if(!ws.length)openApp(id);else if(ws.length>1)previews(ws,b);else{const w=ws[0];(w.el.classList.contains('foc')&&!w.min)?minim(w):focusW(w)}};return b};
  vis.forEach(id=>btn(id,box));
  if(rest.length){const m=H('button','tbb more',box,'···');m.onclick=e=>{e.stopPropagation();miniBar(rest,m,btn)}}
  H('div','sp',tb);const wf=H('button','tbb',tb,`<img src="${IC('network')}">`);wf.title='Network';
  const c=H('div','clk',tb);const tick=()=>{const d=new Date();c.innerHTML=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:!S.mil})+'<br>'+d.toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'})};tick();c._t=tick;
- const p=H('button','tbb',tb);p.append(av(prof()));p.firstChild.style.width=p.firstChild.style.height='70%';p.style.padding=0;p.title='Switch profile';p.onclick=e=>{e.stopPropagation();profMenu(p)}}
+ }
 setInterval(()=>{const c=$('.clk');c&&c._t()},5000);
 /* ---------- popups ---------- */
 const pop=$('#pop');
@@ -64,19 +64,19 @@ function closePop(){pop.innerHTML=''}
 function place(el,anchor){const r=anchor.getBoundingClientRect();el.style.bottom=innerHeight-r.top+10+'px';el.style.left=Math.max(8,Math.min(innerWidth-el.offsetWidth-8,r.left+r.width/2-el.offsetWidth/2))+'px'}
 function previews(ws,a){closePop();const p=H('div','pop prev',pop),PW=190;
  ws.forEach(w=>{const v=H('div','pv',p,`<div class=th></div><p>${APPS[w.app].name} — ${w.id}</p>`);v.style.width=PW+'px';v.onclick=()=>{focusW(w);closePop()};v._w=w});
- const upd=()=>{if(!p.isConnected)return clearInterval(iv);p.querySelectorAll('.pv').forEach(v=>{const w=v._w,th=$('.th',v),W0=w.el.offsetWidth,H0=w.el.offsetHeight,k=PW/W0;th.style.height=H0*k+'px';th.innerHTML='';const c=w.el.cloneNode(true);c.querySelectorAll('.rz').forEach(x=>x.remove());c.classList.remove('min','foc');Object.assign(c.style,{position:'absolute',left:0,top:0,width:W0+'px',height:H0+'px',transform:`scale(${k})`,transformOrigin:'0 0',opacity:1,pointerEvents:'none',transition:'none'});th.append(c)})};
+ const upd=()=>{if(!p.isConnected)return clearInterval(iv);p.querySelectorAll('.pv').forEach(v=>{const w=v._w,th=$('.th',v),W0=w.el.offsetWidth,H0=w.el.offsetHeight,k=PW/W0;th.style.height=H0*k+'px';th.innerHTML='';const c=w.el.cloneNode(true);c.querySelectorAll('.rz').forEach(x=>x.remove());c.classList.remove('min','foc','closing');Object.assign(c.style,{position:'absolute',left:0,top:0,width:W0+'px',height:H0+'px',transform:`scale(${k})`,transformOrigin:'0 0',opacity:1,pointerEvents:'none',transition:'none',animation:'none'});th.append(c)})};
  const iv=setInterval(upd,600);upd();if(ws.length>3){p.style.maxWidth='620px';p.style.overflowX='auto'}place(p,a)}
 function miniBar(rest,a,btn){closePop();const p=H('div','pop prev',pop);const sc=H('div','apps',null);let off=0;const per=5;
  const draw=()=>{sc.innerHTML='';rest.slice(off,off+per).forEach(id=>btn(id,sc))};
  if(rest.length>per){const l=H('button','tbb',p,'‹'),r=H('button','tbb',null,'›');p.append(sc,r);l.onclick=()=>{off=Math.max(0,off-per);draw()};r.onclick=()=>{off=Math.min(rest.length-1,off+per);draw()}}else p.append(sc);draw();place(p,a)}
-function profMenu(a){closePop();const p=H('div','pop pm',pop);S.profiles.forEach(x=>{const r=H('button','',p);r.append(av(x),x.name);r.onclick=()=>{S.cur=x.id;save();lockNow()}});place(p,a);p.style.left='auto';p.style.right='12px'}
 function toggleStart(){if($('#start'))return closePop();closePop();const p=H('div','pop',pop);p.id='start';p.style.bottom=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tbh'))+(S.conn?18:26)+'px';
  p.innerHTML=`<input class=srch placeholder="Search apps" autofocus><div class=grid></div><div class=foot></div>`;p.onclick=e=>e.stopPropagation();
  const g=$('.grid',p),draw=q=>{g.innerHTML='';Object.keys(APPS).filter(k=>APPS[k].name.toLowerCase().includes(q.toLowerCase())).forEach(k=>{const i=H('button','gi',g,`<img src="${IC(APPS[k].icon)}">${APPS[k].name}`);i.onclick=()=>{closePop();openApp(k)}})};draw('');
  $('.srch',p).oninput=e=>draw(e.target.value);setTimeout(()=>$('.srch',p).focus(),30);
  const f=$('.foot',p),me=prof(),pb=H('button','',f);pb.style.cssText='display:flex;align-items:center;gap:10px;flex:1';pb.append(av(me));H('b','',pb).textContent=me.name;
- const pw=H('button','btn',f,'⏻');pw.onclick=()=>{const m=H('div','pop pm',p);m.style.cssText='position:absolute;bottom:56px;right:0;left:auto';[['Sign out',lockNow],['Restart',()=>{sessionStorage.setItem('rz-restart',1);location.reload()}],['Power off',powerOff]].forEach(([n,fn])=>{H('button','',m,n).onclick=fn})};
- pb.onclick=()=>{closePop();profMenu($('#tb button:last-child'))}}
+ const menu=(items,side)=>{p.querySelector('.pm')?.remove();const m=H('div','pop pm',f);m.style.cssText='position:absolute;bottom:56px;'+side+':0';items.forEach(([n,fn,a])=>{const b=H('button','',m);if(a)b.append(a);b.append(n);b.onclick=fn})};
+ const pw=H('button','btn',f,'⏻');pw.onclick=()=>menu([['Sign out',lockNow],['Restart',()=>{sessionStorage.setItem('rz-restart',1);location.reload()}],['Power off',powerOff]],'right');
+ pb.onclick=()=>menu(S.profiles.map(x=>[x.name,()=>{S.cur=x.id;save();lockNow()},av(x)]),'left')}
 addEventListener('click',e=>{if(!e.target.closest('.pop'))closePop()});
 /* ---------- desktop ---------- */
 function desk(){const d=$('#desk');d.innerHTML='';pinned.forEach(k=>{const s=H('div','sc',d,`<img src="${IC(APPS[k].icon)}">${APPS[k].name}`);s.ondblclick=()=>openApp(k);let t=0;s.addEventListener('pointerup',e=>{if(e.pointerType==='touch'){if(Date.now()-t<400)openApp(k);t=Date.now()}})})}
