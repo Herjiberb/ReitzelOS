@@ -72,3 +72,15 @@ html,body{overscroll-behavior:none;touch-action:manipulation}input,textarea{user
 .tbb.multi.act::after{width:26px;background:linear-gradient(90deg,#a600ff 0 64%,transparent 64% 74%,#a600ff 74%)}
 #tb.left .tbb.multi::after,#tb.right .tbb.multi::after{width:3px;height:16px;background:linear-gradient(180deg,#007bff 0 38%,transparent 38% 62%,#007bff 62%)}
 #tb.left .tbb.multi.act::after,#tb.right .tbb.multi.act::after{width:3px;height:26px;background:linear-gradient(180deg,#a600ff 0 64%,transparent 64% 74%,#a600ff 74%)}
+
+.cbox{background:#ffffff0d;backdrop-filter:none;align-items:center;max-width:360px}.cbox .sl{width:calc(100% - 18px);margin:10px 9px}
+.sl{position:relative;height:6px;border-radius:99px;background:#ffffff1f;cursor:pointer;touch-action:none;outline:0}.sl .fill{position:absolute;left:0;top:0;bottom:0;width:var(--v,0%);border-radius:99px;background:linear-gradient(90deg,#3700ff,#a600ff,#007bff)}
+.sl .knob{position:absolute;top:50%;left:var(--v,0%);width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:#fff;box-shadow:0 2px 8px #000a,0 0 0 3px #a600ff66;transition:box-shadow .15s}.sl:hover .knob,.sl:focus .knob{box-shadow:0 2px 8px #000a,0 0 0 6px #a600ff55}
+input[type=checkbox]{appearance:none;-webkit-appearance:none;width:40px;height:22px;border-radius:99px;background:#ffffff22;position:relative;cursor:pointer;transition:.2s;flex:none}
+input[type=checkbox]::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s}
+input[type=checkbox]:checked{background:linear-gradient(135deg,#3700ff,#a600ff,#007bff)}input[type=checkbox]:checked::after{left:20px}
+*{scrollbar-width:thin;scrollbar-color:#7a2dff transparent}::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:linear-gradient(#3700ff,#a600ff);border-radius:99px;border:3px solid transparent;background-clip:padding-box}::-webkit-scrollbar-track{background:transparent}
+
+*:focus,*:focus-visible{outline:none!important}button{-webkit-tap-highlight-color:transparent}
+.sc.sel{background:linear-gradient(135deg,#3700ff55,#a600ff44);box-shadow:inset 0 0 0 1px #a600ffaa}
+.band{position:fixed;z-index:4;background:#a600ff2e;border:1px solid #a600ffaa;border-radius:4px;pointer-events:none}
