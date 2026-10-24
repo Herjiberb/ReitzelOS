@@ -1,80 +1,15 @@
-
 'use strict';
-
-const CACHE_NAME = 'reitzel-v2';
-
-const FILES = [
-  './',
-  './index.html',
-  './style.css',
-  './os.js',
-  './assets/reitzel-icon.svg',
-  './assets/folder-icon.svg',
-  './assets/compass-settings-icon.svg',
-  './assets/network-icon.svg'
-];
-
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(FILES))
-      .then(() => self.skipWaiting())
-  );
-});
-
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(
-        keys
-          .filter(key => key !== CACHE_NAME)
-          .map(key => caches.delete(key))
-      ))
-      .then(() => self.clients.claim())
-  );
-});
-
-self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET') return;
-
-  const url = new URL(event.request.url);
-
-  // Never intercept requests to other origins.
-  if (url.origin !== self.location.origin) return;
-
-  // Always fetch HTML and code from the network first.
-  if (
-    event.request.mode === 'navigate' ||
-    /\.(?:html|js|css)$/i.test(url.pathname)
-  ) {
-    event.respondWith(
-      fetch(event.request, { cache: 'no-store' })
-        .then(response => {
-          if (response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME)
-              .then(cache => cache.put(event.request, copy));
-          }
-          return response;
-        })
-        .catch(async () => {
-          const cached = await caches.match(event.request);
-          if (cached) return cached;
-
-          if (event.request.mode === 'navigate') {
-            return (await caches.match('./index.html')) ||
-              Response.error();
-          }
-
-          return Response.error();
-        })
-    );
-    return;
-  }
-
-  // Use cached assets when available; fetch missing assets.
-  event.respondWith(
-    caches.match(event.request)
-      .then(cached => cached || fetch(event.request))
-  );
+const CACHE_NAME='reitzel-v2';
+const FILES=['./','./index.html','./style.css','./os.js','./assets/reitzel-icon.svg','./assets/folder-icon.svg','./assets/compass-settings-icon.svg','./assets/network-icon.svg'];
+self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting())));
+self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE_NAME).map(x=>caches.delete(x)))).then(()=>self.clients.claim())));
+self.addEventListener('fetch',e=>{
+if(e.request.method!=='GET')return;
+const u=new URL(e.request.url);
+if(u.origin!==self.location.origin)return;
+if(e.request.mode==='navigate'||/\.(?:html|js|css)$/i.test(u.pathname)){
+e.respondWith(fetch(e.request,{cache:'no-store'}).then(r=>{if(r.ok){const c=r.clone();caches.open(CACHE_NAME).then(k=>k.put(e.request,c));}return r;}).catch(async()=>{const r=await caches.match(e.request);if(r)return r;if(e.request.mode==='navigate')return(await caches.match('./index.html'))||Response.error();return Response.error();}));
+return;
+}
+e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));
 });
