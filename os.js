@@ -26,11 +26,11 @@ function applyTheme(){applyVars();tb.className=(S.conn?'conn ':'')+S.pos+(S.loos
 function seg(p,v,o,fn){const s=H('div','seg',p);o.forEach(([k,l])=>{H('button',k===v?'on':'',s,l).onclick=()=>fn(k)});return s}
 function slider(p,v,fn){const sl=H('div','sl',p,'<div class=fill></div><div class=knob></div>');sl.style.setProperty('--v',v*100+'%');const set=x=>{x=cl(x,0,1);sl.style.setProperty('--v',x*100+'%');fn(x)},at=e=>{const r=sl.getBoundingClientRect();set((e.clientX-r.left)/r.width)};sl.onpointerdown=e=>{sl.setPointerCapture(e.pointerId);at(e);sl.onpointermove=at};sl.onpointerup=()=>{sl.onpointermove=null;save()};return sl}
 /* ---------- apps ---------- */
-const APPS={files:{name:'File Explorer',icon:'folder',w:720,h:460,ctx:()=>[['New folder',null,'dis'],['New file',null,'dis'],'sep',['Refresh',()=>{}],['Properties',null,'dis']],render:b=>{b.innerHTML=`<div class=files><img src="${IC('folder')}"><h1>File Explorer</h1></div>`}},
+const APPS={files:{name:'My Files',icon:'folder',w:720,h:460,ctx:()=>[['New folder',null,'dis'],['New file',null,'dis'],'sep',['Refresh',()=>{}],['Properties',null,'dis']],render:b=>{b.innerHTML=`<div class=files><img src="${IC('folder')}"><h1>File Explorer</h1></div>`}},
  settings:{name:'Settings',icon:'compass-settings',w:820,h:540,render:renderSettings}};
 let W=[],zc=10,nid=1;
 /* ---------- windows ---------- */
-function openApp(id,opt){if(id==='files'&&!prof().admin)return toast('File Explorer requires an administrator');const a=APPS[id],A=area(),o=W.length%6*28;const el=H('div','win',$('#wins'));
+function openApp(id,opt){if(id==='files'&&!prof().admin)return toast('My Files requires an administrator');const a=APPS[id],A=area(),o=W.length%6*28;const el=H('div','win',$('#wins'));
  const w={id:nid++,app:id,el,min:false,max:false,prev:null,tab:opt&&opt.tab,sr:null};w.lockCursor=()=>{try{const q=$('.body',el).requestPointerLock();q&&q.catch&&q.catch(()=>{});tb.classList.remove('show');toast('Cursor locked — press Esc to release')}catch{}};W.push(w);
  const bw=Math.min(a.w,A.w-20),bh=Math.min(a.h,A.h-20);Object.assign(el.style,{width:bw+'px',height:bh+'px',left:A.x+Math.max(0,(A.w-bw)/2+o-60)+'px',top:A.y+Math.max(0,(A.h-bh)/2+o-40)+'px'});
  el.innerHTML=`<div class=tbar><img src="${IC(a.icon)}"><span>${a.name}</span><button class="wb m">${X.min}</button><button class="wb mx"><i class=ic>${X.max}</i><div class=snapm></div></button><button class="wb x">${X.x}</button></div><div class=body></div>`+['n','s','e','w','ne','nw','se','sw'].map(d=>`<div class="rz ${d}" data-d=${d}></div>`).join('');
@@ -48,7 +48,7 @@ function genie(w,rev){if(S.noanim){if(!rev&&w.min)w.el.classList.add('min');retu
   kf.push({clipPath:`polygon(${L.concat(Q).join(',')})`,transform:`translate(${dx*sb}px,${dy*eo}px) scaleY(${1-.96*eo})`,opacity:t>.88?(1-t)/.12:1})}
  w.a&&w.a.cancel();e.classList.add('gen');const a=w.a=e.animate(rev?kf.reverse():kf,{duration:rev?460:520,easing:'linear',fill:'both'});
  a.onfinish=()=>{e.classList.remove('gen');if(!rev&&w.min)e.classList.add('min');a.cancel()}}
-function closeW(w){w.el.classList.add('closing');W=W.filter(x=>x!==w);setTimeout(()=>w.el.remove(),200);renderTB()}
+function closeW(w){if(w.beforeClose&&w.beforeClose()&&!w.force&&!confirm("Close with unsaved changes?"))return;w.el.classList.add('closing');W=W.filter(x=>x!==w);setTimeout(()=>w.el.remove(),200);renderTB()}
 function toggleMax(w){const e=w.el,A=area();if(w.max){Object.assign(e.style,w.prev);w.max=false;e.classList.remove('max')}else{w.prev={left:e.style.left,top:e.style.top,width:e.style.width,height:e.style.height};Object.assign(e.style,{left:A.x+'px',top:A.y+'px',width:A.w+'px',height:A.h+'px'});w.sr=null;w.max=true;e.classList.add('max')}
  $('.ic',e).innerHTML=w.max?X.res:X.max;e.classList.add('snap');setTimeout(()=>e.classList.remove('snap'),200);focusW(w)}
 function snap(w,r){const A=area(),e=w.el;if(w.max){w.max=false;e.classList.remove('max');$('.ic',e).innerHTML=X.max}e.classList.add('snap');
@@ -192,7 +192,7 @@ addEventListener('pointerdown',e=>{if(!e.target.closest('.ctx'))closeCtx()},true
 addEventListener('contextmenu',e=>{const t=e.target;e.preventDefault();const f=t.closest('input,textarea');if(f)return ctx(e,[['Cut',()=>{f.focus();document.execCommand('cut')}],['Copy',()=>{f.focus();document.execCommand('copy')}],['Paste',async()=>{try{const x=await navigator.clipboard.readText();f.focus();document.execCommand('insertText',false,x)}catch{}}],'sep',['Select all',()=>{f.focus();f.select()}]]);if(!L.classList.contains('hide')||t.closest('.ctx,.pop'))return;
  const wn=t.closest('.win');if(wn){const w=W.find(x=>x.el===wn),a=APPS[w.app];return ctx(e,(t.closest('.body')&&a.ctx&&a.ctx(e,w))||winMenu(w))}
  if(t.closest('#tb'))return ctx(e,[['Taskbar settings',()=>openTo('Taskbar')]]);
- ctx(e,[['Personalize',()=>openTo('Personalization')],['Taskbar settings',()=>openTo('Taskbar')],'sep',['Open File Explorer',()=>openApp('files')]])});
+ ctx(e,[['Personalize',()=>openTo('Personalization')],['Taskbar settings',()=>openTo('Taskbar')],'sep',['Open My Files',()=>openApp('files')]])});
 /* loose taskbar: reveal at edge, never while the cursor is locked */
 let hideT=0;addEventListener('pointermove',e=>{if(!S.loose||document.pointerLockElement)return;const r=tb.getBoundingClientRect(),sh=tb.classList.contains('show'),E=6,
  edge=S.pos==='bottom'?e.clientY>=innerHeight-E:S.pos==='left'?e.clientX<=E:e.clientX>=innerWidth-E,near=sh&&e.clientX>r.left-24&&e.clientX<r.right+24&&e.clientY>r.top-24&&e.clientY<r.bottom+24;
@@ -236,5 +236,5 @@ addEventListener('mousedown',e=>{if(e.button===1)e.preventDefault()});
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 (async()=>{try{DB=await idb();let s=await load();if(!s)try{s=JSON.parse(localStorage.getItem('rzos'))}catch{}
  if(s){S=s;if(S.bg){S.profiles[0].bg=S.bg;delete S.bg}for(const p of S.profiles)if(p.pw){await setPw(p,p.pw);delete p.pw}save();localStorage.removeItem('rzos')}}catch(e){console.error(e)}
- S.pins??=['files','settings'];S.desk??=[{id:1,app:'files',c:0,r:0},{id:2,app:'settings',c:0,r:1}];S.pos??='bottom';S.loose??=false;S.immersive??=true;S.theme??=0;S.corners??='rounded';S.glass??=.5;if(!S.mig){const lg=Object.fromEntries(PK.map(k=>[k,S[k]!==undefined?S[k]:DP[k]]));S.profiles.forEach(p=>{if(!p.prefs)p.prefs={...lg}});S.mig=1}if(S.profiles.length&&!S.profiles.some(p=>p.admin))S.profiles[0].admin=true;if(S.profiles.length)loadPrefs(S.cur);addEventListener('resize',()=>{closePop();renderTB();refit(1)});addEventListener('keydown',e=>{if(!L.classList.contains('hide')&&e.ctrlKey&&e.altKey&&e.shiftKey&&e.code==='KeyX'){e.preventDefault();factory()}});
+ S.pins??=['files','editor','store','settings'];S.desk??=[{id:1,app:'files',c:0,r:0},{id:2,app:'editor',c:0,r:1},{id:3,app:'store',c:0,r:2},{id:4,app:'settings',c:0,r:3}];S.pos??='bottom';S.loose??=false;S.immersive??=true;S.theme??=0;S.corners??='rounded';S.glass??=.5;if(!S.mig){const lg=Object.fromEntries(PK.map(k=>[k,S[k]!==undefined?S[k]:DP[k]]));S.profiles.forEach(p=>{if(!p.prefs)p.prefs={...lg}});S.mig=1}if(S.profiles.length&&!S.profiles.some(p=>p.admin))S.profiles[0].admin=true;if(S.profiles.length)loadPrefs(S.cur);addEventListener('resize',()=>{closePop();renderTB();refit(1)});addEventListener('keydown',e=>{if(!L.classList.contains('hide')&&e.ctrlKey&&e.altKey&&e.shiftKey&&e.code==='KeyX'){e.preventDefault();factory()}});
  if(S.profiles.length){applyTheme();desk();lockNow()}else{desk();setupProfile()}})();
