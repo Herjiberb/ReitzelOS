@@ -184,3 +184,8 @@ body.noanim *{transition:none!important;animation:none!important}#tb.nodate .dt{
 .st-row{display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:12px;background:#ffffff0d}.st-row img{width:40px}.st-row div{flex:1}
 .st-info{display:grid;grid-template-columns:max-content 1fr;gap:6px 18px;opacity:.85;font-size:13px}.st-info span:nth-child(odd){opacity:.55}
 .mdb p{white-space:pre-line}
+.fm-top button.on,.fm-top button.on:hover,.ed-bar button.on,.ed-bar button.on:hover,.ed-find button.on,.ed-find button.on:hover{background:linear-gradient(135deg,var(--a),var(--b))!important;box-shadow:0 0 0 1px #ffffff40 inset}
+.fsz{min-width:24px;text-align:center;font-size:12px;opacity:.85}
+.dd{display:inline-flex;align-items:center;gap:8px;justify-content:space-between;padding:5px 10px;border-radius:7px;background:#ffffff12;border:1px solid #ffffff1c;white-space:nowrap}.dd:hover{background:#ffffff28}.dd i{font-style:normal;opacity:.6;font-size:11px}
+.ddm{position:fixed;z-index:500;padding:5px;border-radius:11px;background:var(--glass,#1a0e45f2);backdrop-filter:blur(30px) saturate(170%);border:1px solid #ffffff22;box-shadow:0 10px 36px #000a;animation:up .12s;max-height:60vh;overflow:auto}
+.ddm button{display:block;width:100%;text-align:left;padding:7px 12px;border-radius:7px;white-space:nowrap}.ddm button:hover{background:linear-gradient(90deg,color-mix(in srgb,var(--a) 53%,transparent),color-mix(in srgb,var(--b) 33%,transparent))}.ddm button.on{background:#ffffff22}
