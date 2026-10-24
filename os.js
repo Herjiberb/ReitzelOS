@@ -50,11 +50,11 @@ function snap(w,r){const A=area(),e=w.el;if(w.max){w.max=false;e.classList.remov
  w.sr=r;Object.assign(e.style,{left:A.x+A.w*r[0]/100+'px',top:A.y+A.h*r[1]/100+'px',width:A.w*r[2]/100+'px',height:A.h*r[3]/100+'px'});setTimeout(()=>e.classList.remove('snap'),200);focusW(w)}
 function drag(w){const t=$('.tbar',w.el);t.onpointerdown=e=>{if(e.target.closest('button'))return;let sx=e.clientX,sy=e.clientY,L=w.el.offsetLeft,T=w.el.offsetTop;t.setPointerCapture(e.pointerId);
  if(w.max){const ratio=e.clientX/innerWidth;toggleMax(w);L=e.clientX-w.el.offsetWidth*ratio;T=0;sx=e.clientX;sy=e.clientY;w.el.style.left=L+'px'}
- t.onpointermove=m=>{w.sr=null;w.el.style.left=L+m.clientX-sx+'px';w.el.style.top=Math.max(0,T+m.clientY-sy)+'px'};
+ t.onpointermove=m=>{w.sr=null;const A=area(),ew=w.el.offsetWidth;w.el.style.left=cl(L+m.clientX-sx,A.x+60-ew,A.x+A.w-60)+'px';w.el.style.top=cl(T+m.clientY-sy,A.y,A.y+A.h-40)+'px'};
  t.onpointerup=m=>{t.onpointermove=null;if(m.clientY<4)toggleMax(w)}}}
 function resize(w){w.el.querySelectorAll('.rz').forEach(r=>r.onpointerdown=e=>{e.stopPropagation();focusW(w);const d=r.dataset.d,el=w.el,s={x:e.clientX,y:e.clientY,l:el.offsetLeft,t:el.offsetTop,w:el.offsetWidth,h:el.offsetHeight};r.setPointerCapture(e.pointerId);
  r.onpointermove=m=>{w.sr=null;const dx=m.clientX-s.x,dy=m.clientY-s.y,mw=280,mh=180;if(d.includes('e'))el.style.width=Math.max(mw,s.w+dx)+'px';if(d.includes('s'))el.style.height=Math.max(mh,s.h+dy)+'px';
- if(d.includes('w')){const nw=Math.max(mw,s.w-dx);el.style.width=nw+'px';el.style.left=s.l+s.w-nw+'px'}if(d.includes('n')){const nh=Math.max(mh,s.h-dy);el.style.height=nh+'px';el.style.top=s.t+s.h-nh+'px'}};r.onpointerup=()=>r.onpointermove=null})}
+ if(d.includes('w')){const nw=Math.max(mw,s.w-dx);el.style.width=nw+'px';el.style.left=s.l+s.w-nw+'px'}if(d.includes('n')){const A=area(),nt=Math.max(A.y,Math.min(s.t+dy,s.t+s.h-mh));el.style.height=s.t+s.h-nt+'px';el.style.top=nt+'px'}};r.onpointerup=()=>r.onpointermove=null})}
 /* ---------- taskbar ---------- */
 const tb=$('#tb');
 function renderTB(){const V=S.pos!=='bottom',run=[];W.forEach(w=>{if(!S.pins.includes(w.app)&&!run.includes(w.app))run.push(w.app)});tb.innerHTML='';
@@ -124,13 +124,13 @@ function cropAvatar(host,done,cancel){const i=document.createElement('input');i.
   sl.onkeydown=e=>{if(e.key==='ArrowRight'||e.key==='ArrowUp')zoom(k+.15);if(e.key==='ArrowLeft'||e.key==='ArrowDown')zoom(k-.15)};
   const[bc,bs]=B.querySelectorAll('button');bc.onclick=cancel;
   bs.onclick=()=>{const[w,h]=dim(),q=base*k,o=document.createElement('canvas');o.width=o.height=256;o.getContext('2d').drawImage(im,(150-R-(x-w))/q,(150-R-(y-h))/q,2*R/q,2*R/q,0,0,256,256);done(o.toDataURL('image/jpeg',.9))};zoom(1)}}
-function renderSettings(body,w){let tab=w.tab||'Personalization';w.setTab=t=>{tab=t;draw()};const draw=()=>{body.innerHTML=`<div class=app><div class=nav></div><div class=pane></div></div>`;const nv=$('.nav',body),pn=$('.pane',body);
+function renderSettings(body,w){let tab=w.tab||'Personalization';w.setTab=t=>{tab=t;draw()};let lt;const draw=()=>{const op=$('.pane',body),top=op&&lt===tab?op.scrollTop:0;lt=tab;draw0();const np=$('.pane',body);if(np)np.scrollTop=top},draw0=()=>{body.innerHTML=`<div class=app><div class=nav></div><div class=pane></div></div>`;const nv=$('.nav',body),pn=$('.pane',body);
  ['Personalization','Profiles','Taskbar','Time','System'].forEach(t=>{const b=H('button',t===tab?'on':'',nv,t);b.onclick=()=>{tab=t;draw()}});H('h3','',pn).textContent=tab;const card=(h)=>{const c=H('div','card',pn,h||'');return c},row=(c,l)=>{const r=H('div','rw',c);H('span','',r).textContent=l;return r};
  const ref=()=>{save();applyTheme();desk();draw()};
  if(tab==='Personalization'){const p=prof();[['Wallpaper','bg'],['Lock screen','lockbg']].forEach(([l,k])=>{const c=card(),r=row(c,l+' — '+p.name);if(p[k]){const im=H('div','',c);im.style.cssText=`height:90px;border-radius:8px;background:url(${p[k]}) center/cover`}const r2=H('div','rw',r);H('button','btn pri',r2,'Upload').onclick=()=>pickImg(d=>{p[k]=d;ref()},2560);H('button','btn',r2,'Default').onclick=()=>{p[k]=null;ref()}});
  const c1=card('<b>Accent theme</b>'),sw=H('div','sw',c1);THEMES.forEach((T,i)=>{const b=H('button',(S.theme||0)===i?'on':'',sw,`<i style="background:linear-gradient(90deg,${T[1]},${T[2]},${T[3]})"></i>${T[0]}`);b.onclick=()=>{S.theme=i;ref()}});
  const r3=row(card(),'Window corners');seg(r3,S.corners,[['sharp','Sharp'],['rounded','Rounded'],['round','Very round']],v=>{S.corners=v;ref()});
- const c3=card();row(c3,'Glass transparency (taskbar & menus)');slider(c3,S.glass,x=>{S.glass=x;applyVars()});
+ seg(row(card(),'Glass opacity (taskbar & menus)'),S.glass,[[0,'Clear'],[.25,'Light'],[.5,'Default'],[.75,'Rich'],[1,'Solid']],v=>{S.glass=v;ref()});
  const tg=(l,get,set)=>{const r=row(card(),l),i=H('input','',r);i.type='checkbox';i.checked=get();i.onchange=()=>{set(i.checked);ref()}};
  tg('Show date on taskbar',()=>!S.nodate,v=>S.nodate=!v);tg('Reduce animations',()=>!!S.noanim,v=>S.noanim=v)}
  if(tab==='Profiles'){S.profiles.forEach(p=>{const c=card(),r=row(c,'');r.firstChild.remove();const a=av(p);a.style.cssText='width:48px;height:48px;flex:none';r.append(a);
@@ -222,5 +222,5 @@ addEventListener('mousedown',e=>{if(e.button===1)e.preventDefault()});
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 (async()=>{try{DB=await idb();let s=await load();if(!s)try{s=JSON.parse(localStorage.getItem('rzos'))}catch{}
  if(s){S=s;if(S.bg){S.profiles[0].bg=S.bg;delete S.bg}for(const p of S.profiles)if(p.pw){await setPw(p,p.pw);delete p.pw}save();localStorage.removeItem('rzos')}}catch(e){console.error(e)}
- S.pins??=['files','settings'];S.desk??=[{id:1,app:'files',c:0,r:0},{id:2,app:'settings',c:0,r:1}];S.pos??='bottom';S.loose??=false;S.immersive??=true;S.theme??=0;S.corners??='rounded';S.glass??=.5;addEventListener('resize',()=>{closePop();renderTB();refit(1)});addEventListener('keydown',e=>{if(!L.classList.contains('hide')&&e.ctrlKey&&e.altKey&&e.shiftKey&&e.code==='KeyX'){e.preventDefault();factory()}});
+ S.pins??=['files','settings'];S.desk??=[{id:1,app:'files',c:0,r:0},{id:2,app:'settings',c:0,r:1}];S.pos??='bottom';S.loose??=false;S.immersive??=true;S.theme??=0;S.corners??='rounded';S.glass??=.5;S.glass=[0,.25,.5,.75,1].reduce((a,b)=>Math.abs(b-S.glass)<Math.abs(a-S.glass)?b:a);addEventListener('resize',()=>{closePop();renderTB();refit(1)});addEventListener('keydown',e=>{if(!L.classList.contains('hide')&&e.ctrlKey&&e.altKey&&e.shiftKey&&e.code==='KeyX'){e.preventDefault();factory()}});
  applyTheme();desk();lockNow()})();
