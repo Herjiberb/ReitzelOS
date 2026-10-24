@@ -93,7 +93,7 @@ function lockNow(){closePop();L.className='';const p=prof();L.style.setProperty(
   const E1='<svg viewBox="0 0 24 24"><path d="M2 12s3.600-7 10-7 10 7 10 7-3.600 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',E0='<svg viewBox="0 0 24 24"><path d="M3 3l18 18M10.600 6.200A10 10 0 0112 6c6.400 0 10 6 10 6a17 17 0 01-3.200 3.800M6.400 7.600C3.700 9.300 2 12 2 12s3.600 6 10 6c1.500 0 2.800-.3 4-.8"/><path d="M9.900 10A3 3 0 0014 14"/></svg>',ey=H('button','eye',f,E1);ey.type='button';ey.onmousedown=e=>e.preventDefault();
   ey.onclick=()=>{const t=inp.type==='password';inp.type=t?'text':'password';ey.innerHTML=t?E0:E1;inp.focus()}}
  const go=H('button','go',w,'→');const enter=async()=>{if(p.hash&&(await hash(inp.value,p.salt))!==p.hash){w.classList.remove('shake');void w.offsetWidth;w.classList.add('shake');inp.value='';return}L.classList.add('hide');c.remove();startIdle();applyTheme();desk()};
- go.onclick=enter;if(inp)inp.onkeydown=e=>e.key==='Enter'&&enter();
+ go.onclick=enter;if(inp)inp.onkeydown=e=>{if(e.key==='Enter')enter()};
  c.onclick=()=>{c.classList.add('up');if(inp){setTimeout(()=>inp.focus(),120);c.addEventListener('transitionend',()=>inp.focus(),{once:true})}if(!p.hash)go.focus()};
  if(sessionStorage.getItem('rz-restart')){sessionStorage.removeItem('rz-restart')}}
 function startIdle(){const r=()=>{clearTimeout(idle);idle=setTimeout(()=>{if(L.classList.contains('hide'))lockNow()},120000)};['pointerdown','keydown','pointermove'].forEach(e=>addEventListener(e,r));r()}
