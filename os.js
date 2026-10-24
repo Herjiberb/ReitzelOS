@@ -89,10 +89,12 @@ addEventListener('click',e=>{if(!e.target.closest('.pop,.ctx'))closePop()});
 const L=$('#lock');let idle;
 function lockNow(){closePop();L.className='';const p=prof();L.style.setProperty('--bg',bgv(p.lockbg));L.innerHTML=`<div class=lbg></div><div class=login></div><div class=cover><div class=bg></div><div class=t></div><div class=d></div><small>Click or tap to unlock</small></div>`;
  const c=$('.cover',L),tm=()=>{const d=new Date();$('.t',c).textContent=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:!S.mil});$('.d',c).textContent=d.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric'})};tm();const iv=setInterval(()=>{tm();if(L.classList.contains('hide'))clearInterval(iv)},1000);
- const lg=$('.login',L);lg.append(av(p));H('h2','',lg).textContent=p.name;const w=H('div','pw',lg);let inp;if(p.hash){inp=H('input','',w);inp.type='password';inp.placeholder='Password'}
+ const lg=$('.login',L);lg.append(av(p));H('h2','',lg).textContent=p.name;const w=H('div','pw',lg);let inp;if(p.hash){const f=H('div','pwf',w);inp=H('input','',f);inp.type='password';inp.placeholder='Password';inp.autocomplete='off';inp.spellcheck=false;
+  const E1='<svg viewBox="0 0 24 24"><path d="M2 12s3.600-7 10-7 10 7 10 7-3.600 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',E0='<svg viewBox="0 0 24 24"><path d="M3 3l18 18M10.600 6.200A10 10 0 0112 6c6.400 0 10 6 10 6a17 17 0 01-3.200 3.800M6.400 7.600C3.700 9.300 2 12 2 12s3.600 6 10 6c1.500 0 2.800-.3 4-.8"/><path d="M9.900 10A3 3 0 0014 14"/></svg>',ey=H('button','eye',f,E1);ey.type='button';ey.onmousedown=e=>e.preventDefault();
+  ey.onclick=()=>{const t=inp.type==='password';inp.type=t?'text':'password';ey.innerHTML=t?E0:E1;inp.focus()}}
  const go=H('button','go',w,'→');const enter=async()=>{if(p.hash&&(await hash(inp.value,p.salt))!==p.hash){w.classList.remove('shake');void w.offsetWidth;w.classList.add('shake');inp.value='';return}L.classList.add('hide');c.remove();startIdle();applyTheme();desk()};
  go.onclick=enter;if(inp)inp.onkeydown=e=>e.key==='Enter'&&enter();
- c.onclick=()=>{c.classList.add('up');inp&&setTimeout(()=>inp.focus(),500);if(!p.hash)go.focus()};
+ c.onclick=()=>{c.classList.add('up');if(inp){setTimeout(()=>inp.focus(),120);c.addEventListener('transitionend',()=>inp.focus(),{once:true})}if(!p.hash)go.focus()};
  if(sessionStorage.getItem('rz-restart')){sessionStorage.removeItem('rz-restart')}}
 function startIdle(){const r=()=>{clearTimeout(idle);idle=setTimeout(()=>{if(L.classList.contains('hide'))lockNow()},120000)};['pointerdown','keydown','pointermove'].forEach(e=>addEventListener(e,r));r()}
 function powerOff(){closePop();const o=$('#off');o.style.display='grid';o.textContent='Click to power on';W.forEach(w=>w.el.remove());W=[];o.onclick=()=>{o.style.display='none';lockNow()};lockNow()}
@@ -192,8 +194,12 @@ function selectable(host,o){let anchor=null,pend=null,sx=0,sy=0,band=null,base=n
 selectable($('#desk'),{items:()=>deskEls,sel:selIds,change:paintSel});
 addEventListener('keydown',e=>{if(e.key==='Tab')e.preventDefault()},true);
 /* ---------- browser lockdown ---------- */
-function immerse(){if(!S.immersive||document.fullscreenElement)return;try{const p=document.documentElement.requestFullscreen({navigationUI:'hide'});p&&p.then(()=>navigator.keyboard&&navigator.keyboard.lock(['KeyT','KeyW','KeyN','KeyR','KeyL','KeyD','KeyP','KeyS','KeyF','KeyU','KeyG','KeyH','KeyJ','KeyK','KeyO','KeyB','KeyE','Tab','F5','F6','F3'])).catch(()=>{})}catch{}}
-addEventListener('pointerdown',immerse);
+const KL=['KeyT','KeyW','KeyN','Tab','F5','F6'];
+function klock(){try{navigator.keyboard&&navigator.keyboard.lock(KL).catch(()=>{})}catch{}}
+function immerse(){if(!S.immersive||document.fullscreenElement)return;try{const p=document.documentElement.requestFullscreen({navigationUI:'hide'});p&&p.then(klock).catch(()=>{})}catch{}}
+document.addEventListener('focusin',e=>{if(e.target.closest&&e.target.closest('input,textarea')){try{navigator.keyboard&&navigator.keyboard.unlock()}catch{}}});
+document.addEventListener('focusout',e=>{if(S.immersive&&document.fullscreenElement&&e.target.closest&&e.target.closest('input,textarea'))klock()});
+addEventListener('click',e=>{if(!e.target.closest('input,textarea'))immerse()});
 addEventListener('keydown',e=>{const k=e.key.toLowerCase(),m=e.ctrlKey||e.metaKey;if(m&&((k.length===1&&'swprfdulgehkjbo+-=0'.includes(k))||/^(tab|pageup|pagedown|[1-9])$/.test(k)))e.preventDefault();if(/^F([1-9]|10)$/.test(e.key)||(e.altKey&&/^Arrow(Left|Right)$/.test(e.key)))e.preventDefault()},true);
 addEventListener('wheel',e=>{if(e.ctrlKey)e.preventDefault()},{passive:false});
 addEventListener('mousedown',e=>{if(e.button===1)e.preventDefault()});
