@@ -64,3 +64,11 @@ img{-webkit-user-drag:none}button{font:inherit;color:inherit;border:0;background
 #tb.left .tbb.run::after,#tb.right .tbb.run::after{bottom:auto;top:50%;transform:translateY(-50%);width:3px;height:6px}
 #tb.left .tbb.act::after,#tb.right .tbb.act::after{height:14px}#tb.left .tbb::after{left:1px}#tb.right .tbb::after{right:1px;left:auto}
 #tb.loose:not(.show){transform:var(--hid);pointer-events:none}
+
+html,body{overscroll-behavior:none;touch-action:manipulation}
+
+html,body{overscroll-behavior:none;touch-action:manipulation}input,textarea{user-select:text}img{pointer-events:none}
+.tbb.multi::after{width:16px;background:linear-gradient(90deg,#007bff 0 38%,transparent 38% 62%,#007bff 62%)}
+.tbb.multi.act::after{width:26px;background:linear-gradient(90deg,#a600ff 0 64%,transparent 64% 74%,#a600ff 74%)}
+#tb.left .tbb.multi::after,#tb.right .tbb.multi::after{width:3px;height:16px;background:linear-gradient(180deg,#007bff 0 38%,transparent 38% 62%,#007bff 62%)}
+#tb.left .tbb.multi.act::after,#tb.right .tbb.multi.act::after{width:3px;height:26px;background:linear-gradient(180deg,#a600ff 0 64%,transparent 64% 74%,#a600ff 74%)}
