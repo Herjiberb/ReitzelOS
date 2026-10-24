@@ -30,8 +30,16 @@ function openApp(id){const a=APPS[id],A=area(),o=W.length%6*28;const el=H('div',
  $('.m',el).onclick=()=>minim(w);$('.x',el).onclick=()=>closeW(w);$('.mx',el).onclick=e=>{if(!e.target.closest('.snapm'))toggleMax(w)};
  $('.tbar',el).ondblclick=e=>{if(!e.target.closest('button'))toggleMax(w)};
  el.onpointerdown=()=>focusW(w);drag(w);resize(w);a.render($('.body',el),w);focusW(w);renderTB();return w}
-function focusW(w){w.min=false;w.el.classList.remove('min');w.el.style.zIndex=++zc;W.forEach(x=>x.el.classList.toggle('foc',x===w));renderTB()}
-function minim(w){const e=w.el,b=$(`#tb [data-app="${w.app}"]`);if(b){const r=b.getBoundingClientRect();e.style.setProperty('--tx',r.left+r.width/2-(e.offsetLeft+e.offsetWidth/2)+'px');e.style.setProperty('--ty',r.top+r.height/2-(e.offsetTop+e.offsetHeight/2)+'px')}w.min=true;e.classList.add('min');W.forEach(x=>x.el.classList.remove('foc'));renderTB()}
+function focusW(w){const was=w.min;w.min=false;w.el.classList.remove('min');w.el.style.zIndex=++zc;W.forEach(x=>x.el.classList.toggle('foc',x===w));renderTB();if(was)genie(w,true)}
+function minim(w){w.min=true;W.forEach(x=>x.el.classList.remove('foc'));renderTB();genie(w,false)}
+const ss=x=>x*x*(3-2*x),cl=(x,a,b)=>Math.min(b,Math.max(a,x));
+function genie(w,rev){const e=w.el,b=$(`#tb [data-app="${w.app}"]`)||$('#tb .more'),R=b?b.getBoundingClientRect():{left:innerWidth/2-20,top:innerHeight-50,width:40,height:40};
+ const W0=e.offsetWidth,H0=e.offsetHeight,dx=R.left+R.width/2-(e.offsetLeft+W0/2),dy=R.top+R.height/2-(e.offsetTop+H0/2),iw=Math.max(.04,R.width*.5/W0),N=18,kf=[];
+ for(let k=0;k<=N;k++){const t=k/N,eo=ss(t),sb=ss(cl(t*1.6,0,1)),L=[],Q=[];
+  for(let j=0;j<=14;j++){const y=j/14,s=ss(cl(t*1.6-(1-y)*.6,0,1)),wf=1-(1-iw)*s,off=cl(dx*(s-sb)/W0,-.4,.4);L.push(`${cl(.5+off-wf/2,0,1)*100}% ${y*100}%`);Q.unshift(`${cl(.5+off+wf/2,0,1)*100}% ${y*100}%`)}
+  kf.push({clipPath:`polygon(${L.concat(Q).join(',')})`,transform:`translate(${dx*sb}px,${dy*eo}px) scaleY(${1-.96*eo})`,opacity:t>.88?(1-t)/.12:1})}
+ w.a&&w.a.cancel();e.classList.add('gen');const a=w.a=e.animate(rev?kf.reverse():kf,{duration:rev?460:520,easing:'linear',fill:'both'});
+ a.onfinish=()=>{e.classList.remove('gen');if(!rev&&w.min)e.classList.add('min');a.cancel()}}
 function closeW(w){w.el.classList.add('closing');W=W.filter(x=>x!==w);setTimeout(()=>w.el.remove(),200);renderTB()}
 function toggleMax(w){const e=w.el,A=area();if(w.max){Object.assign(e.style,w.prev);w.max=false;e.classList.remove('max')}else{w.prev={left:e.style.left,top:e.style.top,width:e.style.width,height:e.style.height};Object.assign(e.style,{left:0,top:0,width:A.w+'px',height:innerHeight+'px'});w.max=true;e.classList.add('max')}
  $('.ic',e).innerHTML=w.max?X.res:X.max;e.classList.add('snap');setTimeout(()=>e.classList.remove('snap'),200);focusW(w)}
