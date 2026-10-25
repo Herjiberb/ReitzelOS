@@ -686,7 +686,7 @@ function renderTerm(body,w){const P0=prof(),user=P0.root?'root':(P0.name||'user'
   else if(k==='Tab'){e.preventDefault();if(!t.busy&&!t.askr)complete()}
   else if(k==='ArrowUp'&&!t.askr){e.preventDefault();if(t.hi<0)t.hi=H0.length;t.hi=Math.max(0,t.hi-1);if(H0[t.hi]!=null)inp.value=H0[t.hi]}else if(k==='ArrowDown'&&!t.askr){e.preventDefault();if(t.hi<0)return;t.hi++;inp.value=t.hi>=H0.length?'':H0[t.hi];if(t.hi>=H0.length)t.hi=-1}};
  tmEl.addEventListener('pointerdown',e=>{if(!window.getSelection().toString())setTimeout(()=>{if(!window.getSelection().toString())inp.focus()},0)});
- emit(TK('u','ReitzelOS Terminal')+TK('m','  ·  ')+'type '+TK('a','help')+' to see what I can do, or '+TK('g','fag')+' followed by what you want in plain English.\n');
+ emit(TK('u','ReitzelOS Terminal')+TK('m','  ·  ')+'type '+TK('a','help')+' to see what I can do.\n');
  setP();setTimeout(()=>inp.focus(),60);
 }
 /* ---------- register ---------- */
