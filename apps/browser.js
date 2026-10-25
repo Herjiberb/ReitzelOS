@@ -178,7 +178,15 @@ function stwShim(C,D){
  try{if(window.navigation&&navigation.addEventListener)navigation.addEventListener('navigate',function(e){if(!armed||!e.cancelable||e.hashChange||e.downloadRequest||e.formData)return;var ty=e.navigationType;if(ty==='reload'||ty==='traverse')return;var u=e.destination&&e.destination.url;if(!u||/^(javascript|data|blob):/i.test(u))return;if(u.split('#')[0]===String(location.href).split('#')[0])return;e.preventDefault();armed=0;go(u,false)})}catch(x){}
  document.addEventListener('submit',function(e){var f=e.target;if(e.defaultPrevented||(f.method||'get').toLowerCase()!=='get')return;e.preventDefault();
   var sb=e.submitter,act=(sb&&sb.getAttribute&&sb.getAttribute('formaction'))||f.getAttribute('action')||furl(self),p=abs(act),base=p!==null?furl(p):act,q=new URLSearchParams(new FormData(f)).toString();send('nav',{url:base.split('#')[0]+(base.indexOf('?')>-1?'&':'?')+q})},false);
- window.open=function(u){if(u)go(String(u),true);return null};window.close=function(){send('close')};
+ window.open=function(u){if(u)go(String(u),true);return null};
+ /* Reitzel emoji inside pages */
+ if(C.emo&&C.emo.map){var ER=new RegExp(C.emo.rx,'gu'),EK=/^(INPUT|TEXTAREA|SELECT|SCRIPT|STYLE|NOSCRIPT)$/;
+  var efix=function(n){if(n.nodeType===3){var s=n.nodeValue;ER.lastIndex=0;if(!ER.test(s))return;var p=n.parentNode;if(!p||EK.test(p.nodeName)||p.isContentEditable||(p.closest&&p.closest('svg,[contenteditable]')))return;var fr=document.createDocumentFragment(),last=0,m;ER.lastIndex=0;
+    while((m=ER.exec(s))){var u=C.emo.map[String.fromCodePoint(m[0].codePointAt(0))];if(!u)continue;fr.append(s.slice(last,m.index));var i=document.createElement('img');i.src=u;i.alt=m[0];i.style.cssText='width:1.15em;height:1.15em;vertical-align:-.2em;display:inline-block';fr.append(i);last=m.index+m[0].length}fr.append(s.slice(last));p.replaceChild(fr,n)}
+   else if(n.nodeType===1&&!EK.test(n.nodeName)){for(var c=n.firstChild;c;){var nx=c.nextSibling;efix(c);c=nx}}};
+  new MutationObserver(function(ms){ms.forEach(function(m){if(m.type==='characterData')efix(m.target);else m.addedNodes.forEach(efix)})}).observe(document,{childList:true,subtree:true,characterData:true});
+  if(document.body)efix(document.body);document.addEventListener('DOMContentLoaded',function(){efix(document.body)})}
+window.close=function(){send('close')};
  /* downloads -> OS file system */
  function dl(a){var h=a.getAttribute('href'),p=abs(h),name=a.getAttribute('download')||h.split('?')[0].split('/').pop()||'download';
   (p!==null?req('read',{path:p}):oF.call(window,h).then(function(r){return r.arrayBuffer().then(function(b){return{buf:b,type:r.headers.get('content-type')||''}})})).then(function(r){send('save',{name:name,buf:r.buf,type:r.type})},function(){})}
@@ -338,7 +346,7 @@ function renderSpot(body,w){
    const ss=el.getAttribute('srcset');if(ss)el.setAttribute('srcset',(await Promise.all(ss.split(',').map(async x=>{const[a,...b]=x.trim().split(/\s+/);return[(await blobFor(t,a,dir))||a,...b].join(' ')}))).join(', '))})()));
   await Promise.all(jobs);
   let ls={};try{ls=JSON.parse(localStorage.getItem('stwls.'+S.cur+'.'+FS.path(id))||'{}')}catch{}
-  const sc=doc.createElement('script');sc.setAttribute('data-stw','1');sc.textContent='('+stwShim.toString()+')('+JSON.stringify({tab:t.id,dir:dp,file:m.n,ls}).replace(/</g,'\\u003c')+',('+domSer.toString()+'))';
+  const sc=doc.createElement('script');sc.setAttribute('data-stw','1');sc.textContent='('+stwShim.toString()+')('+JSON.stringify({tab:t.id,dir:dp,file:m.n,ls,emo:window.RZEmoji&&RZEmoji.shim()}).replace(/</g,'\\u003c')+',('+domSer.toString()+'))';
   (doc.head||doc.documentElement).prepend(sc);return'<!doctype html>'+doc.documentElement.outerHTML}
  async function loadFile(t){const tok=t.tok,path=fpath(t.url);let id;try{id=FS.resolve(path)}catch{id=null}const m=id&&FS.get(id);
   const err=(h,p)=>{t.v.innerHTML='';const pg=H('div','stw-pg err',t.v,`<svg width=84 height=84 viewBox="0 0 24 24" fill=none stroke=#9aa0a6 stroke-width=1.4 stroke-linecap=round><path d="M6 3h8l4 4v14H6zM14 3v4h4M9 13l6 5M15 13l-6 5"/></svg><h2>${h}</h2><p></p><div class=row></div>`);$('p',pg).textContent=p;H('button','b pri',$('.row',pg),'Go home').onclick=()=>go(t,'browse.stw');t.title='File not found';done(t)};
