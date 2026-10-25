@@ -133,7 +133,7 @@ const Xctu=(()=>{
    log:e=>{console.warn('['+m.name+']',e);toast(m.name+': '+String(e).slice(0,120))},
    'fs.home':()=>FS.path(FS.home()),'fs.list':p=>{const d=node(p);if(!d||d.t!=='d')throw Error('No such folder');return FS.kids(d.id).map(info)},'fs.stat':p=>{const x=node(p);if(!x)throw Error('Not found');return info(x)},
    'fs.readText':async p=>{const x=node(p);if(!x||x.t!=='f')throw Error('No such file');return(await FS.blob(x.id)).text()},'fs.readBytes':async p=>{const x=node(p);if(!x||x.t!=='f')throw Error('No such file');return(await FS.blob(x.id)).arrayBuffer()},
-   'fs.writeText':(p,t)=>fsw(p,new Blob([String(t)])),'fs.writeBytes':(p,b)=>fsw(p,new Blob([b])),'fs.mkdir':async p=>{const{d,n}=split(p);if(d.ro)throw Error('Read-only location');await FS.mkdir(d.id,n)},
+   'fs.writeText':(p,t)=>fsw(p,new Blob([String(t)])),'fs.writeBytes':(p,b)=>fsw(p,new Blob([b])),'fs.mkdir':async p=>{const{d,n}=split(p),ex=FS.K.get(d.id).get(n.toLowerCase()),o=ex&&FS.get(ex);if(o)return o.t==='d'?undefined:Promise.reject(Error('A file with that name exists'));if(d.ro)throw Error('Read-only location');await FS.mkdir(d.id,n)},
    'clip.read':()=>navigator.clipboard.readText(),'clip.write':t=>navigator.clipboard.writeText(String(t)),
    'apps.open':i=>{if(!APPS[i])throw Error('No such app');openApp(i)},'apps.list':()=>Object.keys(APPS).filter(k=>!APPS[k].hide).map(k=>({id:k,name:APPS[k].name})),
    'desktop.pin':()=>pin(id),'users.list':()=>S.profiles.map(p=>({name:p.name,admin:!!p.admin})),'system.lock':()=>{setTimeout(()=>lockNow(),100)},'system.theme':i=>{i=+i;if(!THEMES[i])throw Error('No such theme');S.theme=i;applyVars();save()}};
