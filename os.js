@@ -72,11 +72,16 @@ function resize(w){w.el.querySelectorAll('.rz').forEach(r=>r.onpointerdown=e=>{e
  if(d.includes('w')){const nw=Math.max(mw,s.w-dx);el.style.width=nw+'px';el.style.left=s.l+s.w-nw+'px'}if(d.includes('n')){const A=area(),nt=Math.max(A.y,Math.min(s.t+dy,s.t+s.h-mh));el.style.height=s.t+s.h-nt+'px';el.style.top=nt+'px'}};r.onpointerup=()=>r.onpointermove=null})}
 /* ---------- taskbar ---------- */
 const tb=$('#tb');
-function renderTB(){const V=S.pos!=='bottom',run=[];W.forEach(w=>{if(!w.temp&&!S.pins.includes(w.app)&&!run.includes(w.app))run.push(w.app)});tb.innerHTML='';
+let runOrd=[];const reorderTB=ids=>{S.pins=[...ids.filter(x=>S.pins.includes(x)),...S.pins.filter(x=>!ids.includes(x))];runOrd=[...ids.filter(x=>!S.pins.includes(x)),...runOrd.filter(x=>!ids.includes(x))];save();renderTB()};
+function renderTB(){const V=S.pos!=='bottom',run=[];W.forEach(w=>{if(!w.temp&&!S.pins.includes(w.app)&&!run.includes(w.app))run.push(w.app)});run.sort((a,b)=>{const x=runOrd.indexOf(a),y=runOrd.indexOf(b);return(x<0?1e3:x)-(y<0?1e3:y)});tb.innerHTML='';
  const s=H('button','tbb',tb,`<img src="${IC('reitzel')}">`);s.onclick=e=>{e.stopPropagation();toggleStart()};
  const box=H('div','apps',tb),sz=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--ico'))+14,A=S.pins.concat(run).filter(k=>APPS[k]),room=V?innerHeight-260-sz*2:innerWidth-(S.conn?60:90)-330-sz*2,fit=Math.max(1,Math.floor(room/sz)),vis=A.length>fit?A.slice(0,fit-1):A,rest=A.slice(vis.length);
  const btn=(id,p)=>{const ws=W.filter(w=>w.app===id),b=H('button','tbb'+(ws.length?' run':'')+(ws.length>1?' multi':'')+(ws.some(w=>w.el.classList.contains('foc'))?' act':''),p,`<img src="${IC(APPS[id].icon)}">`);b.dataset.app=id;
-  b.onclick=e=>{e.stopPropagation();if(!ws.length)openApp(id);else if(ws.length>1)previews(ws,b);else{const w=ws[0];(w.el.classList.contains('foc')&&!w.min)?minim(w):focusW(w)}};
+  b.onpointerdown=e=>{if(e.button!==0)return;const sx=e.clientX,sy=e.clientY;let on=0;
+   const mv=ev=>{const d=V?ev.clientY-sy:ev.clientX-sx;if(!on){if(Math.hypot(ev.clientX-sx,ev.clientY-sy)<6)return;on=1;b.classList.add('drg');closePop()}b.style.transform=V?`translateY(${d}px)`:`translateX(${d}px)`};
+   const up=ev=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up);removeEventListener('pointercancel',up);if(!on)return;b._mv=1;setTimeout(()=>b._mv=0,50);const c=V?ev.clientY:ev.clientX,list=[...box.querySelectorAll('.tbb[data-app]')].filter(x=>x!==b);let i=list.findIndex(x=>{const r=x.getBoundingClientRect();return c<(V?r.top+r.height/2:r.left+r.width/2)});if(i<0)i=list.length;const ids=list.map(x=>x.dataset.app);ids.splice(i,0,id);reorderTB(ids)};
+   addEventListener('pointermove',mv);addEventListener('pointerup',up);addEventListener('pointercancel',up)};
+  b.onclick=e=>{e.stopPropagation();if(b._mv)return;if(!ws.length)openApp(id);else if(ws.length>1)previews(ws,b);else{const w=ws[0];(w.el.classList.contains('foc')&&!w.min)?minim(w):focusW(w)}};
   b.oncontextmenu=e=>{e.preventDefault();e.stopPropagation();const pn=S.pins.includes(id);ctx(e,[['Open',()=>openApp(id)],'sep',[pn?'Unpin from taskbar':'Pin to taskbar',()=>pn?unpin(id):pin(id)],...(ws.length?['sep',[ws.length>1?'Close all windows':'Close window',()=>ws.slice().forEach(closeW)]]:[])])};return b};
  vis.forEach((id,i)=>{if(i&&i===S.pins.length)H('i','dv',box);btn(id,box)});
  if(rest.length){const m=H('button','tbb more',box,'···');m.onclick=e=>{e.stopPropagation();miniBar(rest,m,btn)}}
@@ -222,7 +227,7 @@ window.RZ={lockCursor:w=>w.lockCursor(),unlockCursor:()=>document.exitPointerLoc
 /* ---------- lock down browser behaviour ---------- */
 let RZleave=0;
 addEventListener('beforeunload',e=>{if(!RZleave){e.preventDefault();e.returnValue=''}});
-addEventListener('keydown',e=>{if(e.key==='Escape')return;const inp=e.target.closest&&e.target.closest('input,textarea'),m=e.ctrlKey||e.metaKey,ok=inp&&m&&['a','c','v','x','z','y'].includes(e.key.toLowerCase());
+addEventListener('keydown',e=>{if(e.key==='Escape')return;const inp=e.target.closest&&e.target.closest('input,textarea,[contenteditable]'),m=e.ctrlKey||e.metaKey,kk=e.key.toLowerCase(),nav=/^(arrow|home$|end$|backspace$|delete$|pageup$|pagedown$)/.test(kk)&&!e.altKey,txt=e.target.closest&&e.target.closest('.stw-pg,.stw-dev,.tm-out,.stw-menu'),ok=m&&((inp&&(['a','c','v','x','z','y'].includes(kk)||nav))||(!inp&&txt&&['a','c'].includes(kk)))||(inp&&e.shiftKey&&nav);
  if(!ok&&(m||e.key==='Alt'||/^F\d+$/.test(e.key)||(e.altKey&&/^Arrow|^Home/.test(e.key))))e.preventDefault()},true);
 addEventListener('wheel',e=>{if(e.ctrlKey)e.preventDefault()},{passive:false});
 ['gesturestart','gesturechange','dragstart','auxclick','dblclick'].forEach(t=>addEventListener(t,e=>{if(t!=='dblclick'||e.target.closest('.tbar,.sc'))return t==='dblclick'?0:e.preventDefault();e.preventDefault()},{passive:false}));
@@ -256,7 +261,8 @@ addEventListener('mousedown',e=>{if(e.button===1)e.preventDefault()});
 ['gesturestart','gesturechange','dragstart','auxclick'].forEach(n=>addEventListener(n,e=>e.preventDefault()));
 /* ---------- boot ---------- */
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
-(async()=>{try{DB=await idb();let s=await load();if(!s)try{s=JSON.parse(localStorage.getItem('rzos'))}catch{}
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch{}
+(async()=>{try{DB=await idb();let s=await load();if(!s){await new Promise(r=>setTimeout(r,250));s=await load()}if(!s)try{s=JSON.parse(localStorage.getItem('rzos'))}catch{}
  if(s){S=s;if(S.bg){S.profiles[0].bg=S.bg;delete S.bg}for(const p of S.profiles)if(p.pw){await setPw(p,p.pw);delete p.pw}localStorage.removeItem('rzos')}}catch(e){console.error(e)}
  S.profiles??=[];S.desk??=[];
  if(!S.mig){const lg=Object.fromEntries(PK.map(k=>[k,S[k]!==undefined?S[k]:DP[k]]));S.profiles.forEach(p=>{if(!p.prefs)p.prefs={...lg}});S.mig=1}
