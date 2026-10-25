@@ -210,7 +210,7 @@ function ctx(e,items){closeCtx();const m=cx=H('div','ctx',document.body);items.f
 const winMenu=w=>[['Minimize',()=>minim(w)],[w.max?'Restore':'Maximize',()=>toggleMax(w)],'sep',['Close',()=>closeW(w)]];
 addEventListener('pointerdown',e=>{if(!e.target.closest('.ctx'))closeCtx()},true);addEventListener('keydown',e=>e.key==='Escape'&&closeCtx());addEventListener('blur',closeCtx);
 addEventListener('contextmenu',e=>{const t=e.target;e.preventDefault();const f=t.closest('input,textarea');if(f)return ctx(e,[['Cut',()=>{f.focus();document.execCommand('cut')}],['Copy',()=>{f.focus();document.execCommand('copy')}],['Paste',async()=>{try{const x=await navigator.clipboard.readText();f.focus();document.execCommand('insertText',false,x)}catch{}}],'sep',['Select all',()=>{f.focus();f.select()}]]);if(!L.classList.contains('hide')||t.closest('.ctx,.pop'))return;
- const wn=t.closest('.win');if(wn){const w=W.find(x=>x.el===wn),a=APPS[w.app];return ctx(e,(t.closest('.body')&&a.ctx&&a.ctx(e,w))||winMenu(w))}
+ const wn=t.closest('.win');if(wn){const w=W.find(x=>x.el===wn),a=APPS[w.app];if(a.noctx&&t.closest('.body'))return;return ctx(e,(t.closest('.body')&&a.ctx&&a.ctx(e,w))||winMenu(w))}
  if(t.closest('#tb'))return ctx(e,[['Taskbar settings',()=>openTo('Taskbar')]]);
  ctx(e,[['Personalize',()=>openTo('Personalization')],['Taskbar settings',()=>openTo('Taskbar')],'sep',['Open My Files',()=>openApp('files')]])});
 /* loose taskbar: reveal at edge, never while the cursor is locked */
@@ -227,7 +227,7 @@ addEventListener('keydown',e=>{if(e.key==='Escape')return;const inp=e.target.clo
 addEventListener('wheel',e=>{if(e.ctrlKey)e.preventDefault()},{passive:false});
 ['gesturestart','gesturechange','dragstart','auxclick','dblclick'].forEach(t=>addEventListener(t,e=>{if(t!=='dblclick'||e.target.closest('.tbar,.sc'))return t==='dblclick'?0:e.preventDefault();e.preventDefault()},{passive:false}));
 addEventListener('mousedown',e=>{if(e.button===1)e.preventDefault()});
-addEventListener('pointerdown',()=>{document.documentElement.requestFullscreen?.({navigationUI:'hide'}).then(()=>navigator.keyboard?.lock?.()).catch(()=>{})},{once:true});
+addEventListener('pointerdown',()=>{if(document.fullscreenElement)return;document.documentElement.requestFullscreen?.({navigationUI:'hide'}).then(()=>navigator.keyboard?.lock?.()).catch(()=>{})},{once:true});
 /* ---------- reusable multi-select (desktop now, File Explorer later) ---------- */
 function selectable(host,o){let anchor=null,pend=null,sx=0,sy=0,band=null,base=null;const sel=o.sel;
  host.addEventListener('pointerdown',e=>{if(e.button!==0)return;sx=e.clientX;sy=e.clientY;const its=o.items(),hit=its.find(i=>i.el.contains(e.target)),add=e.ctrlKey||e.metaKey,rng=e.shiftKey;pend=null;
@@ -246,8 +246,10 @@ const KL=['KeyT','KeyW','KeyN','Tab','F5','F6'];
 let kl=0;function klock(){if(kl)return;kl=1;try{navigator.keyboard&&navigator.keyboard.lock(KL).catch(()=>{kl=0})}catch{kl=0}}
 function kunlock(){kl=0;try{navigator.keyboard&&navigator.keyboard.unlock()}catch{}}
 document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement)kl=0});
-function immerse(){if(!S.immersive)return;if(document.fullscreenElement)return klock();try{const p=document.documentElement.requestFullscreen({navigationUI:'hide'});p&&p.then(klock).catch(()=>{})}catch{}}
-addEventListener('click',e=>{if(!e.target.closest('input,textarea'))immerse()});
+let imp=0;function immerse(){if(!S.immersive||imp)return;if(document.fullscreenElement)return klock();imp=1;try{const p=document.documentElement.requestFullscreen({navigationUI:'hide'});if(p)p.then(klock).catch(()=>{}).finally(()=>{imp=0});else imp=0}catch{imp=0}}
+/* capture phase: taskbar/start-menu/dialog handlers call stopPropagation(), so a bubbling listener never saw those clicks */
+addEventListener('click',e=>{if(!(e.target.closest&&e.target.closest('input,textarea')))immerse()},true);
+addEventListener('blur',()=>setTimeout(()=>{const a=document.activeElement;if(a&&a.tagName==='IFRAME')immerse()},0));
 addEventListener('keydown',e=>{const k=e.key.toLowerCase(),m=e.ctrlKey||e.metaKey;if(m&&((k.length===1&&'swprfdulgehkjbo+-=0'.includes(k))||/^(tab|pageup|pagedown|[1-9])$/.test(k)))e.preventDefault();if(/^F([1-9]|10)$/.test(e.key)||(e.altKey&&/^Arrow(Left|Right)$/.test(e.key)))e.preventDefault()},true);
 addEventListener('wheel',e=>{if(e.ctrlKey)e.preventDefault()},{passive:false});
 addEventListener('mousedown',e=>{if(e.button===1)e.preventDefault()});
