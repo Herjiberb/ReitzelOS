@@ -84,7 +84,7 @@ const Xctu=(()=>{
   for(const k of['main','icon'])if(!files.has(man[k]))issues.push('Entry “'+man[k]+'” is missing');
   if(man.bg&&!files.has(man.bg))issues.push('Background script “'+man.bg+'” is missing');
   man.perms=normPerms(man.perms).filter(p=>permOk(p.id));
-  const pk={m:man,files,issues,size:blob.size};pk.iconUri=files.has(man.icon)?await dataUri(files.get(man.icon)):null;return pk}
+  const pk={m:man,files,issues,size:blob.size};{const ix=EXT(man.icon||''),mt={svg:'image/svg+xml',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp'}[ix];pk.iconUri=files.has(man.icon)&&mt?await dataUri(new Blob([await u8(files.get(man.icon))],{type:mt})):null}return pk}
 
  /* ---------- installed packages (IndexedDB, per profile) ---------- */
  const odb=new Promise(r=>{const q=indexedDB.open('rz-xctu',1);q.onupgradeneeded=()=>q.result.createObjectStore('pk',{keyPath:'key'});q.onsuccess=()=>r(q.result);q.onerror=()=>r(null)});
