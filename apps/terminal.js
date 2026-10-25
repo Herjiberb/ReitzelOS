@@ -120,6 +120,7 @@ function renderTerm(body,w){const P0=prof(),user=P0.root?'root':(P0.name||'user'
  def('help','System','Show this help','help [command]',async a=>{if(a[0]){const c=CMD[a[0]];if(!c)throw Error('help: no command “'+a[0]+'”');return TK('a',a[0])+' — '+c.d+'\n  usage: '+c.u}
   const g={};Object.entries(CMD).forEach(([n,c])=>{if(n==='shutdown'||n==='vim')return;(g[c.g]=g[c.g]||[]).push(n)});return[TK('u','ReitzelOS Terminal')+'  ·  type '+TK('a','help <command>')+' for details, '+TK('a','Tab')+' to complete, '+TK('a','↑↓')+' for history','Pipes (|), redirects (> >>), ; and && all work. Globs like *.txt too.','',...['Files','Text','Apps','Tools','System','Admin','Fun'].filter(k=>g[k]).map(k=>TK('d',k.padEnd(7))+g[k].map(n=>TK('a',n)).join('  ')),'',TK('g','fag')+' <what you want to do>  — describe it in plain English and I’ll run the right command.','e.g.  '+TK('m','fag find all png files   ·   fag make a folder called Taxes   ·   fag biggest files')].join('\n')});
  CMD.man=CMD.help;
+ typeof Xctu!=='undefined'&&Xctu.terminal({def,asked,TK,look,parentOf,wr,t,FS,emit});
  /* ---- fag: plain-English → command ---- */
  const sq=x=>{x=x.trim().replace(/^["'`]|["'`]$/g,'').replace(/[?!.]+$/,'');return /[\s'"]/.test(x)?JSON.stringify(x):x||'.'};
  const FAG=[
