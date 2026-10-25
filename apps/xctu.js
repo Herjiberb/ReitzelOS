@@ -91,8 +91,26 @@ const Xctu=(()=>{
   typeof renderTB==='function'&&renderTB()}
  const WIN_TEMP=new Set();
  async function install(pk,grants,buf){await tx('readwrite',s=>s.put({key:S.cur+':'+pk.m.id,prof:S.cur,id:pk.m.id,buf,grants,at:Date.now()}));mount(pk,grants,false)}
- async function remove(id){const r=(await rec()).find(x=>x.id===id);if(!r)return false;await tx('readwrite',s=>s.delete(S.cur+':'+id));const a=AID(id);
+ async function remove(id){const r=(await rec()).find(x=>x.id===id);if(!r)return false;await tx('readwrite',s=>s.delete(S.cur+':'+id));const a=AID(id);await wipe(id);
   W.filter(x=>x.app===a).forEach(closeW);S.pins=(S.pins||[]).filter(x=>x!==a);S.desk=(S.desk||[]).filter(x=>x.app!==a);try{SC.dropApp(a)}catch{}delete APPS[a];MOUNTED.delete(a);save();renderTB();typeof desk==='function'&&desk();return true}
+
+ /* ---------- app cache tracking: what each app made (never what it merely opened) ---------- */
+ const MK=id=>'xctu.made.'+S.cur+'.'+id,KV=id=>'xctu.kv.'+S.cur+'.'+id;
+ const lsj=k=>{try{return JSON.parse(localStorage.getItem(k)||'null')}catch{return null}};
+ const made=id=>lsj(MK(id))||[];
+ const addMade=(id,fid)=>{const l=made(id);if(!l.includes(fid)){l.push(fid);try{localStorage.setItem(MK(id),JSON.stringify(l))}catch{}}};
+ function usage(id){const raw=localStorage.getItem(KV(id))||'',kv=lsj(KV(id))||{},fl=made(id).map(i=>FS.get(i)).filter(Boolean);
+  return{id,kvKeys:Object.keys(kv).length,kvBytes:raw.length,files:fl.filter(m=>m.t==='f').length,dirs:fl.filter(m=>m.t==='d').length,bytes:fl.reduce((a,m)=>a+(m.t==='f'?m.s||0:0),0),list:fl}}
+ /* wipe ONLY the app's own storage and the files/folders it created; folders that now hold anything else are kept */
+ async function wipe(id){const u=usage(id);let del=0,skip=0;localStorage.removeItem(KV(id));
+  const fl=u.list.filter(m=>m.t==='f').map(m=>m.id);for(const i of fl){try{await FS.del([i]);del++}catch{skip++}}
+  const ds=u.list.filter(m=>m.t==='d').sort((a,b)=>FS.path(b.id).length-FS.path(a.id).length);for(const d of ds){try{if(FS.get(d.id)&&!FS.kids(d.id).length){await FS.del([d.id]);del++}else skip++}catch{skip++}}
+  localStorage.removeItem(MK(id));return{del,skip,kv:u.kvBytes}}
+ async function orphans(){const have=new Set((await rec()).map(r=>r.id)),pk='xctu.kv.'+S.cur+'.',pm='xctu.made.'+S.cur+'.',out=new Set();
+  for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);for(const p of[pk,pm])if(k.startsWith(p)){const id=k.slice(p.length);if(!have.has(id)&&!APPS[AID(id)])out.add(id)}}return[...out]}
+ async function report(){const l=await rec(),o=await orphans();return[...l.map(r=>({...usage(r.id),name:(APPS[AID(r.id)]||{}).name||r.id,orphan:false})),...o.map(id=>({...usage(id),name:id,orphan:true}))]}
+ const tree=(id,pre='')=>{const k=FS.kids(id).sort((a,b)=>(a.t===b.t?a.n.localeCompare(b.n):a.t==='d'?-1:1));return k.flatMap((m,i)=>{const last=i===k.length-1,line=pre+(last?'└─ ':'├─ ')+m.n+(m.t==='d'?'/':'  '+fmtSz(m.s||0));return[line,...(m.t==='d'?tree(m.id,pre+(last?'   ':'│  ')):[])]})};
+ const sysStat=()=>{let n=0,sz=0;const st=[FS.sysId()];while(st.length){for(const m of FS.kids(st.pop())){if(m.t==='d')st.push(m.id);else{n++;sz+=m.s||0}}}return{n,sz}};
 
  /* ---------- runtime ---------- */
  function mount(pk,grants,temp){const m=pk.m,id=AID(m.id);grants=grants.filter(p=>permOk(p));
@@ -103,8 +121,8 @@ const Xctu=(()=>{
   addEventListener('message',e=>{const d=e.data;if(!d||!d.xctu)return;if(d.r){const p=P.get(d.i);if(!p)return;P.delete(d.i);d.err?p[1](Error(d.err)):p[0](d.v)}else if(d.ev)(L[d.ev]||[]).forEach(f=>f(d.v))});
   const as=nm=>call('asset',nm),url=async nm=>C[nm]||(C[nm]=await as(nm).then(r=>URL.createObjectURL(new Blob([r.buf],{type:r.type}))));
   const X={app:I.app,perms:I.perms,user:I.user,can:p=>I.perms.includes(p),on:(ev,f)=>{(L[ev]=L[ev]||[]).push(f)},
-   ui:{toast:m=>call('ui.toast',m),confirm:(msg,o)=>call('ui.confirm',msg,o),title:t=>call('ui.title',t),close:()=>call('ui.close'),resize:(w,h)=>call('ui.resize',w,h)},
-   store:{get:k=>call('store.get',k),set:(k,v)=>call('store.set',k,v),remove:k=>call('store.remove',k),keys:()=>call('store.keys')},
+   info:()=>call('sys.info'),cache:{size:()=>call('cache.size'),clear:()=>call('cache.clear')},ui:{toast:m=>call('ui.toast',m),confirm:(msg,o)=>call('ui.confirm',msg,o),title:t=>call('ui.title',t),close:()=>call('ui.close'),resize:(w,h)=>call('ui.resize',w,h)},
+   store:{get:k=>call('store.get',k),set:(k,v)=>call('store.set',k,v),remove:k=>call('store.remove',k),keys:()=>call('store.keys'),clear:()=>call('store.clear')},
    asset:{url,text:async nm=>new TextDecoder().decode((await as(nm)).buf),bytes:async nm=>new Uint8Array((await as(nm)).buf)},
    fs:{list:p=>call('fs.list',p),stat:p=>call('fs.stat',p),readText:p=>call('fs.readText',p),readBytes:async p=>new Uint8Array(await call('fs.readBytes',p)),writeText:(p,t)=>call('fs.writeText',p,t),writeBytes:(p,b)=>call('fs.writeBytes',p,b instanceof Uint8Array?b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength):b),mkdir:p=>call('fs.mkdir',p),home:()=>call('fs.home')},
    clipboard:{read:()=>call('clip.read'),write:t=>call('clip.write',t)},apps:{open:i=>call('apps.open',i),list:()=>call('apps.list')},desktop:{pin:()=>call('desktop.pin')},
@@ -124,16 +142,16 @@ const Xctu=(()=>{
   const node=p=>{p=String(p||'~').replace(/^~(?=\/|$)/,()=>FS.path(FS.home()));const i=FS.resolve(p,FS.home());return i?FS.get(i):null};
   const split=p=>{p=String(p).replace(/^~(?=\/|$)/,()=>FS.path(FS.home())).replace(/\/+$/,'');const i=p.lastIndexOf('/'),d=node(i<=0?'/':p.slice(0,i));if(!d||d.t!=='d')throw Error('No such folder');return{d,n:p.slice(i+1)}};
   const info=x=>({name:x.n,type:x.t==='d'?'dir':'file',size:x.s||0,modified:x.m,path:FS.path(x.id)});
-  const fsw=async(p,blob)=>{if(blob.size>20*1048576)throw Error('File too large (20 MB max)');const{d,n}=split(p);if(d.ro)throw Error('Read-only location');const ex=FS.K.get(d.id).get(n.toLowerCase()),old=ex&&FS.get(ex);if(old&&(old.t==='d'||old.ro))throw Error('Cannot overwrite '+n);await FS.write(d.id,n,blob,old?old.id:null,0,'xctu')};
+  const fsw=async(p,blob)=>{if(blob.size>20*1048576)throw Error('File too large (20 MB max)');const{d,n}=split(p);if(d.ro)throw Error('Read-only location');const ex=FS.K.get(d.id).get(n.toLowerCase()),old=ex&&FS.get(ex);if(old&&(old.t==='d'||old.ro))throw Error('Cannot overwrite '+n);const w=await FS.write(d.id,n,blob,old?old.id:null,0,'xctu');if(!old)addMade(m.id,w.id)};
   const H_={
    'ui.toast':m=>toast(String(m).slice(0,200)),'ui.confirm':(msg,o)=>sysConfirm({title:(o&&o.title)||m.name,msg:String(msg).slice(0,400),ok:(o&&o.ok)||'OK'}),
    'ui.title':t=>{$('.tbar span',win.el).textContent=String(t).slice(0,60)},'ui.close':()=>closeW(win),'ui.resize':(w,h)=>{win.el.style.width=Math.max(240,Math.min(+w||0,innerWidth))+'px';win.el.style.height=Math.max(160,Math.min(+h||0,innerHeight))+'px'},
-   'store.get':k=>kv()[k]??null,'store.set':(k,v)=>{const o=kv();o[k]=v;const s=JSON.stringify(o);if(s.length>1048576)throw Error('Storage full (1 MB)');localStorage.setItem(kvk,s)},'store.remove':k=>{const o=kv();delete o[k];localStorage.setItem(kvk,JSON.stringify(o))},'store.keys':()=>Object.keys(kv()),
+   'store.get':k=>kv()[k]??null,'store.set':(k,v)=>{const o=kv();o[k]=v;const s=JSON.stringify(o);if(s.length>1048576)throw Error('Storage full (1 MB)');localStorage.setItem(kvk,s)},'store.remove':k=>{const o=kv();delete o[k];localStorage.setItem(kvk,JSON.stringify(o))},'store.keys':()=>Object.keys(kv()),'store.clear':()=>localStorage.removeItem(kvk),'cache.size':()=>{const u=usage(m.id);return{storage:u.kvBytes,files:u.files,fileBytes:u.bytes}},'cache.clear':async()=>{const r=await wipe(m.id);return{removed:r.del}},'sys.info':()=>({os:'Reitzel OS',time:Date.now(),online:navigator.onLine,theme:S.theme,admin:isAdm(),apps:Object.keys(APPS).length}),
    asset:async n=>{const b=pk.files.get(String(n));if(!b)throw Error('No such asset: '+n);return{type:MIME[EXT(n)]||b.type||'application/octet-stream',buf:await b.arrayBuffer()}},
    log:e=>{console.warn('['+m.name+']',e);toast(m.name+': '+String(e).slice(0,120))},
    'fs.home':()=>FS.path(FS.home()),'fs.list':p=>{const d=node(p);if(!d||d.t!=='d')throw Error('No such folder');return FS.kids(d.id).map(info)},'fs.stat':p=>{const x=node(p);if(!x)throw Error('Not found');return info(x)},
    'fs.readText':async p=>{const x=node(p);if(!x||x.t!=='f')throw Error('No such file');return(await FS.blob(x.id)).text()},'fs.readBytes':async p=>{const x=node(p);if(!x||x.t!=='f')throw Error('No such file');return(await FS.blob(x.id)).arrayBuffer()},
-   'fs.writeText':(p,t)=>fsw(p,new Blob([String(t)])),'fs.writeBytes':(p,b)=>fsw(p,new Blob([b])),'fs.mkdir':async p=>{const{d,n}=split(p),ex=FS.K.get(d.id).get(n.toLowerCase()),o=ex&&FS.get(ex);if(o)return o.t==='d'?undefined:Promise.reject(Error('A file with that name exists'));if(d.ro)throw Error('Read-only location');await FS.mkdir(d.id,n)},
+   'fs.writeText':(p,t)=>fsw(p,new Blob([String(t)])),'fs.writeBytes':(p,b)=>fsw(p,new Blob([b])),'fs.mkdir':async p=>{const{d,n}=split(p),ex=FS.K.get(d.id).get(n.toLowerCase()),o=ex&&FS.get(ex);if(o)return o.t==='d'?undefined:Promise.reject(Error('A file with that name exists'));if(d.ro)throw Error('Read-only location');addMade(m.id,(await FS.mkdir(d.id,n)).id)},
    'clip.read':()=>navigator.clipboard.readText(),'clip.write':t=>navigator.clipboard.writeText(String(t)),
    'apps.open':i=>{if(!APPS[i])throw Error('No such app');openApp(i)},'apps.list':()=>Object.keys(APPS).filter(k=>!APPS[k].hide).map(k=>({id:k,name:APPS[k].name})),
    'desktop.pin':()=>pin(id),'users.list':()=>S.profiles.map(p=>({name:p.name,admin:!!p.admin})),'system.lock':()=>{setTimeout(()=>lockNow(),100)},'system.theme':i=>{i=+i;if(!THEMES[i])throw Error('No such theme');S.theme=i;applyVars();save()}};
@@ -184,15 +202,19 @@ const Xctu=(()=>{
   'style.css':()=>'body{padding:18px;display:grid;gap:10px;align-content:start}\nh2{margin:0}\n',
   'main.js':()=>"/* Runs inside the sandbox. `xctu` is your bridge to the OS (see docs in apps/xctu.js). */\nconst key='clicks';\nlet n=(await xctu.store.get(key))||0;\nconst out=document.getElementById('n');out.textContent=n;\ndocument.getElementById('b').onclick=async()=>{\n  out.textContent=++n;\n  await xctu.store.set(key,n);\n  if(n%10===0)xctu.ui.toast('Nice, '+n+' clicks!');\n};\nxctu.ui.title('Hello — '+xctu.user.name);\n",
   'icon.svg':()=>'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#007bff"/><circle cx="32" cy="32" r="14" fill="#fff"/></svg>\n'};
+ const TPL={hello:{d:'click counter (default)'},
+  notes:{d:'persistent notepad using app storage',html:'<textarea id="t" placeholder="Write something…"></textarea><small id="s"></small>',css:'body{display:grid;grid-template-rows:1fr auto;padding:10px;gap:6px;box-sizing:border-box}textarea{resize:none;height:100%}',js:"const t=document.getElementById('t'),s=document.getElementById('s');t.value=(await xctu.store.get('note'))||'';let h;t.oninput=()=>{clearTimeout(h);h=setTimeout(async()=>{await xctu.store.set('note',t.value);s.textContent='saved '+new Date().toLocaleTimeString()},300)};"},
+  timer:{d:'stopwatch with laps',html:'<h1 id="d">0.0</h1><div><button id="g">Start</button> <button id="l">Lap</button> <button id="r">Reset</button></div><ol id="o"></ol>',css:'body{padding:16px;text-align:center}h1{font-size:44px;margin:0}',js:"let t0=0,acc=0,id=0;const d=document.getElementById('d'),o=document.getElementById('o'),g=document.getElementById('g');const now=()=>(acc+(t0?Date.now()-t0:0))/1000;g.onclick=()=>{if(t0){acc+=Date.now()-t0;t0=0;clearInterval(id);g.textContent='Start'}else{t0=Date.now();id=setInterval(()=>d.textContent=now().toFixed(1),100);g.textContent='Stop'}};document.getElementById('l').onclick=()=>{o.insertAdjacentHTML('afterbegin','<li>'+now().toFixed(2)+'s</li>')};document.getElementById('r').onclick=()=>{clearInterval(id);t0=acc=0;d.textContent='0.0';o.innerHTML='';g.textContent='Start'};"},
+  files:{d:'file lister (needs the fs permission)',perms:[{id:'fs',why:'Lists your home folder',required:true}],html:'<h3>Home</h3><ul id="l"></ul>',css:'body{padding:14px}',js:"const l=document.getElementById('l');for(const f of await xctu.fs.list('~'))l.insertAdjacentHTML('beforeend','<li>'+(f.type==='dir'?'📁 ':'📄 ')+f.name.replace(/</g,'&lt;')+'</li>');"}};
  function terminal(T){const{def,asked,TK,look,parentOf,wr,t,FS:fs}=T,P=p=>look(p);
   const dirArg=a=>{const m=P(a||'.');if(!m||m.t!=='d')throw Error((a||'.')+': not a project folder');return m};
   const rep=(r,name)=>[...r.E.map(x=>TK('e','  ✖ ')+x),...r.W.map(x=>TK('w','  ⚠ ')+x)].join('\n')||TK('g','  ✔ '+name+': no problems');
   const usage=()=>[TK('u','XCTU — build and run your own apps'),'',TK('a','xctu new <folder>')+'            scaffold a project (xctu.json, main.js, app.html, style.css, icon.svg)',TK('a','xctu check [folder]')+'        validate the project (errors block compiling)',TK('a','xctu build [folder] [-y]')+'  compile wizard → <id>.xctu  (-y reuses xctu.json answers)',
-   TK('a','xctu info <file.xctu>')+'      show a package, its permissions and integrity',TK('a','xctu run <file.xctu>')+'       permission wizard, then run (or install)',TK('a','xctu install <file.xctu>')+'   same wizard, opened ready to install',TK('a','xctu list')+'                   installed .xctu apps',TK('a','xctu remove <id>')+'          uninstall'].join('\n');
+   TK('a','xctu info <file.xctu>')+'      show a package, its permissions and integrity',TK('a','xctu run <file.xctu>')+'       permission wizard, then run (or install)',TK('a','xctu install <file.xctu>')+'   same wizard, opened ready to install',TK('a','xctu list')+'                   installed .xctu apps',TK('a','xctu remove <id>')+'          uninstall (also wipes its cache)',TK('a','xctu sys')+'                    live /.system structure (auto-synced to the running OS)',TK('a','xctu cache')+'                  what apps created: storage + files',TK('a','xctu clean <id>|--orphans|--all')+'  delete ONLY app-made data',TK('a','xctu perms|revoke|export <id>')+'  inspect, revoke or export an installed app',TK('a','xctu stats')+' · '+TK('a','xctu templates')+'   overview · starter templates'].join('\n');
   def('xctu','Apps','Create, compile and run .xctu apps','xctu <new|check|build|info|run|install|list|remove> …',async a=>{const sub=a[0];a=a.slice(1);
    if(!sub||sub==='help')return usage();
-   if(sub==='new'){if(!a[0])throw Error('usage: xctu new <folder>');const{dir,name}=parentOf(a[0]);wr(dir);if(!ID.test(name))throw Error('folder name doubles as the app id: lowercase letters, digits, dashes (2–32 chars)');
-    const f=await fs.mkdir(dir.id,name);for(const k in SCAFFOLD)await fs.write(f.id,k,new Blob([SCAFFOLD[k](name)]),null,0,'term');
+   if(sub==='new'){if(!a[0])throw Error('usage: xctu new <folder> [template]  (see xctu templates)');const tp=TPL[a[1]||'hello'];if(!tp)throw Error('unknown template — try `xctu templates`');const{dir,name}=parentOf(a[0]);wr(dir);if(!ID.test(name))throw Error('folder name doubles as the app id: lowercase letters, digits, dashes (2–32 chars)');
+    const f=await fs.mkdir(dir.id,name);for(const k in SCAFFOLD){let c=SCAFFOLD[k](name);if(k==='xctu.json'&&tp.perms)c=JSON.stringify({...JSON.parse(c),perms:tp.perms},null,1);if(k==='main.js'&&tp.js)c=tp.js;if(k==='app.html'&&tp.html)c=tp.html;if(k==='style.css'&&tp.css)c=tp.css;await fs.write(f.id,k,new Blob([c]),null,0,'term')}
     return TK('g','created ')+a[0]+'\n  edit main.js / app.html / style.css, then run '+TK('a','xctu build '+a[0])+'\n  tip: `edit '+a[0]+'/main.js`'}
    if(sub==='check'){const d=dirArg(a[0]),r=await lint(d.id);return TK('u','checking ')+d.n+'\n'+rep(r,d.n)+'\n'+(r.E.length?TK('e','✖ '+r.E.length+' error(s) — fix these before building'):TK('g','✔ ready to build'))}
    if(sub==='build'){const yes=a.includes('-y');a=a.filter(x=>x!=='-y');const d=dirArg(a[0]);
@@ -227,7 +249,39 @@ const Xctu=(()=>{
      ' integrity '+(pk.issues.length?TK('e','✖ '+pk.issues.join('; ')):TK('g','✔ seal verified')),' perms     '+(x.perms.length?'':'none'),...x.perms.map(p=>'   '+TK('a',p.id.padEnd(11))+Apps.PERMS[p.id].label+(Apps.PERMS[p.id].admin?TK('w',' [admin only]'):'')+(p.required?' (required)':'')+(p.why?TK('m','  — '+p.why):'')),x.adminOnly?TK('w',' only administrators can open this app'):''].filter(s=>s!=='').join('\n')}
    if(sub==='list'){const l=await rec();return l.length?l.map(r=>TK('a',r.id.padEnd(20))+'granted: '+(r.grants.join(', ')||'none')).join('\n'):'no .xctu apps installed'}
    if(sub==='remove'){if(!a[0])throw Error('usage: xctu remove <id>');if(!await remove(a[0]))throw Error(a[0]+': not installed');return TK('g','removed ')+a[0]}
+   if(sub==='sys'){if(a[0]!=='nosync'){const r=await FS.syncSys();var rp=r.ok?TK('m','synced with the running OS: +'+r.add+' new, '+r.upd+' updated, '+r.del+' removed'):TK('w','offline — showing the last synced copy')}
+    const st=sysStat();return[TK('u','/.system')+TK('m','  — live system structure ('+st.n+' files, '+fmtSz(st.sz)+')'),...tree(FS.sysId()),'',rp||''].join('\n')}
+   if(sub==='cache'||sub==='caches'){const l=await report();if(!l.length)return'no .xctu apps installed, no caches';
+    const tot=l.reduce((x,u)=>x+u.kvBytes+u.bytes,0);
+    return[TK('u','App caches')+TK('m','  (only data apps created themselves — files they merely open are never listed)'),...l.map(u=>TK('a',u.id.padEnd(20))+('storage '+fmtSz(u.kvBytes)+' ('+u.kvKeys+' keys)').padEnd(30)+('files '+u.files+' · '+fmtSz(u.bytes)).padEnd(24)+(u.orphan?TK('w','uninstalled — leftover'):'')),...l.flatMap(u=>u.list.filter(m=>m.t==='f').slice(0,5).map(m=>TK('m','   '+u.id+' → '+FS.path(m.id)))),'',TK('m','total '+fmtSz(tot)+' · clean with: xctu clean <id> | --orphans | --all')].join('\n')}
+   if(sub==='clean'){const all=a.includes('--all'),orp=a.includes('--orphans'),ids=a.filter(x=>x[0]!=='-');let tg;
+    if(all)tg=(await report()).map(u=>u.id);else if(orp)tg=await orphans();else if(ids.length)tg=ids;else throw Error('usage: xctu clean <id> | --orphans | --all');
+    if(!tg.length)return TK('g','nothing to clean');if(!a.includes('-y')){const ok=await asked(TK('a','? ')+'Delete the storage and created files of '+tg.join(', ')+'? Other files stay untouched. (y/n) [n]: ');if(!ok||!/^y/i.test(ok))return TK('w','cancelled')}
+    const out=[];for(const id of tg){const r=await wipe(id);out.push(TK('g','✔ ')+id.padEnd(20)+r.del+' item(s) deleted'+(r.skip?TK('w',', '+r.skip+' kept (in use or not empty)'):'')+', storage '+fmtSz(r.kv))}return out.join('\n')}
+   if(sub==='export'){const r=(await rec()).find(x=>x.id===a[0]);if(!r)throw Error('usage: xctu export <installed-id>');const h=FS.home(),f=await fs.write(h,r.id+'.xctu',new Blob([r.buf]),null,0,'term');return TK('g','exported ')+fs.path(f.id)}
+   if(sub==='perms'||sub==='revoke'){const r=(await rec()).find(x=>x.id===a[0]);if(!r)throw Error('usage: xctu '+sub+' <id>'+(sub==='revoke'?' <permission>':''));
+    if(sub==='revoke'){if(!r.grants.includes(a[1]))throw Error(a[0]+' has no “'+a[1]+'” grant');r.grants=r.grants.filter(x=>x!==a[1]);await tx('readwrite',s=>s.put(r));await mountAll();return TK('g','revoked ')+a[1]+' from '+a[0]}
+    return r.grants.length?r.grants.map(g=>TK('a',g.padEnd(12))+(Apps.PERMS[g]||{}).label).join('\n'):'no permissions granted'}
+   if(sub==='stats'){const l=await rec(),c=await report(),st=sysStat();return[TK('u','XCTU overview'),' installed apps   '+l.length,' app storage      '+fmtSz(c.reduce((x,u)=>x+u.kvBytes+u.bytes,0)),' leftovers        '+c.filter(u=>u.orphan).length,' system files    '+st.n+' ('+fmtSz(st.sz)+')',' permissions      '+Object.keys(Apps.PERMS).length+' kinds'].join('\n')}
+   if(sub==='templates')return TK('u','Templates')+'\n'+Object.keys(TPL).map(k=>TK('a',k.padEnd(10))+TPL[k].d).join('\n')+'\n'+TK('m','use: xctu new <folder> <template>')
    throw Error('xctu: unknown subcommand “'+sub+'” — try `xctu help`')})}
+
+ /* ---------- XCTU Manager (GUI): live system structure + app caches ---------- */
+ Apps.style('xctu-manager','.xm{display:flex;flex-direction:column;height:100%}.xm nav{display:flex;gap:6px;padding:8px}.xm nav button.on{outline:2px solid var(--b)}.xm main{flex:1;overflow:auto;padding:0 12px 12px}.xm pre{margin:0;font:12px/1.5 ui-monospace,monospace;white-space:pre}.xm .xr{display:flex;gap:10px;align-items:center;padding:8px 10px;margin:6px 0;border-radius:10px;background:rgba(255,255,255,.07)}.xm .xr div{flex:1;min-width:0}.xm small{opacity:.65;display:block}');
+ Apps.register('xctu-manager',{name:'XCTU Manager',icon:ICON,w:640,h:480,cat:'system',perms:[],render:body=>{
+  body.innerHTML='';const root=H('div','xm',body),nav=H('nav','',root),main=H('main','',root);let tab='cache';
+  const tabs=[['cache','App caches'],['sys','System files'],['apps','Installed']];
+  const draw=async()=>{nav.innerHTML='';tabs.forEach(([k,l])=>{const b=H('button','btn'+(tab===k?' on':''),nav,l);b.onclick=()=>{tab=k;draw()}});main.innerHTML='';
+   if(tab==='sys'){const sb=H('button','btn',nav,'↻ Sync now');sb.onclick=async()=>{sb.disabled=true;const r=await FS.syncSys();toast(r.ok?'System synced: +'+r.add+' ~'+r.upd+' −'+r.del:'Offline — showing last copy');draw()};
+    const st=sysStat();H('small','',main,'/.system — what the running OS ships ('+st.n+' files, '+fmtSz(st.sz)+')');H('pre','',main).textContent=['.system/',...tree(FS.sysId())].join('\n')}
+   else if(tab==='cache'){const l=await report();if(!l.length)return H('p','',main,'No app caches. Nothing to clean 🎉');
+    H('small','',main,'Only data an app created itself is listed. Files it merely opened or edited are never touched.');
+    l.forEach(u=>{const r=H('div','xr',main,'<div><b></b><small></small></div>');$('b',r).textContent=u.name+(u.orphan?' (uninstalled)':'');$('small',r).textContent='storage '+fmtSz(u.kvBytes)+' · '+u.files+' file(s), '+fmtSz(u.bytes);
+     H('button','btn dng',r,'Clean').onclick=async()=>{const x=await wipe(u.id);toast(x.del+' item(s) cleaned');draw()}});
+    H('button','btn pri',main,'Clean everything').onclick=async()=>{for(const u of l)await wipe(u.id);toast('All app caches cleaned');draw()}}
+   else{const l=await rec();if(!l.length)return H('p','',main,'No .xctu apps installed.');l.forEach(x=>{const a=APPS[AID(x.id)]||{},r=H('div','xr',main,'<div><b></b><small></small></div>');$('b',r).textContent=a.name||x.id;$('small',r).textContent='granted: '+(x.grants.join(', ')||'none')+' · installed '+fmtDt(x.at);
+     H('button','btn',r,'Open').onclick=()=>openApp(AID(x.id));H('button','btn dng',r,'Remove').onclick=async()=>{await remove(x.id);draw()}})}};
+  draw()}});
 
  /* ---------- wiring into the OS ---------- */
  OPENERS.unshift({id:'xctu',name:'XCTU Runner',icon:ICON,test:m=>m.t==='f'&&EXT(m.n)==='xctu',open:m=>open(m.id)});
