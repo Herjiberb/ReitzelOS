@@ -9,7 +9,7 @@ const hash=async(pw,salt)=>{const d=new TextEncoder().encode(salt+'|'+pw);if(cry
 const setPw=async(p,v)=>{if(!v){p.salt=p.hash='';return}p.salt=[...crypto.getRandomValues(new Uint32Array(3))].join('-');p.hash=await hash(v,p.salt)};
 const factory=()=>{if(!confirm('Factory reset? This erases all profiles, passwords, wallpapers and settings.'))return;RZleave=1;try{DB.close()}catch{}localStorage.removeItem('rzos');const q=indexedDB.deleteDatabase('reitzel-os');q.onsuccess=q.onerror=q.onblocked=()=>location.reload()};
 const PK=['theme','corners','glass','nodate','noanim','pos','size','conn','loose','mil'],DP={theme:0,corners:'rounded',glass:.5,nodate:false,noanim:false,pos:'bottom',size:'compact',conn:false,loose:false,mil:false};let PL=null;
-const save=()=>{try{const lp=S.profiles.find(p=>p.id===PL);if(lp)lp.prefs=Object.fromEntries(PK.map(k=>[k,S[k]]));DB.transaction('kv','readwrite').objectStore('kv').put(S,'state')}catch(e){console.error(e)}};
+const save=()=>{try{const lp=S.profiles.find(p=>p.id===PL);if(lp)lp.prefs=Object.fromEntries(PK.map(k=>[k,S[k]]));{const ds=S.desk;if(ds)S.desk=ds.filter(x=>!x.fsc);try{DB.transaction('kv','readwrite').objectStore('kv').put(S,'state')}finally{S.desk=ds}}window.deskHook&&window.deskHook()}catch(e){console.error(e)}};
 function loadPrefs(id){const p=S.profiles.find(x=>x.id===id),q=(p&&p.prefs)||{};PK.forEach(k=>S[k]=q[k]!==undefined?q[k]:DP[k]);S.glass=[0,.25,.5,.75,1].reduce((a,b)=>Math.abs(b-S.glass)<Math.abs(a-S.glass)?b:a);PL=id}
 function switchTo(id){save();S.cur=id;loadPrefs(id);applyVars();save()}
 const nameTaken=(v,p)=>S.profiles.some(x=>x!==p&&x.name.trim().toLowerCase()===v.toLowerCase());
@@ -169,21 +169,22 @@ const grid=()=>{const A=area();return{x:A.x,y:A.y,c:Math.max(1,Math.floor((A.w-P
 function freeCell(G,tk,c0,r0){let best=null,bd=1e9;for(let c=0;c<G.c;c++)for(let r=0;r<G.r;r++){if(tk.has(c+','+r))continue;const d=(c-c0)**2+(r-r0)**2;if(d<bd){bd=d;best=[c,r]}}return best}
 const selIds=new Set();let deskEls=[];
 const paintSel=()=>deskEls.forEach(i=>i.el.classList.toggle('sel',selIds.has(i.key)));
-function desk(fit){const d=$('#desk'),G=grid(),tk=new Set();d.innerHTML='';deskEls=[];S.desk.forEach(s=>s.dc=null);
+function desk(fit){window.deskPre&&window.deskPre();const d=$('#desk'),G=grid(),tk=new Set();d.innerHTML='';deskEls=[];S.desk.forEach(s=>s.dc=null);
  S.desk.forEach(s=>{let c=s.c,r=s.r;if((fit&&(c>=G.c||r>=G.r))||tk.has(c+','+r)){const f=freeCell(G,tk,Math.min(c,G.c-1),Math.min(r,G.r-1));if(!f)return;[c,r]=f;if(fit){s.c=c;s.r=r}}tk.add(c+','+r);s.dc=c;s.dr=r;
-  const a=APPS[s.app],nm=s.name||a.name,el=H('div','sc'+(selIds.has(s.id)?' sel':''),d,`<img src="${IC(a.icon)}"><span></span>`);$('span',el).textContent=nm;deskEls.push({key:s.id,el});el.style.left=G.x+PAD+c*CW+'px';el.style.top=G.y+PAD+r*CH+'px';
-  let st=null,mv=0,lt=0,gr=[];el.ondblclick=()=>openApp(s.app);
+  const a=s.fsc?{icon:s.icon,name:s.name}:APPS[s.app],nm=s.name||a.name,el=H('div','sc'+(s.fsc?' fsc':'')+(selIds.has(s.id)?' sel':''),d,`<img src="${IC(a.icon)}"><span></span>`);$('span',el).textContent=nm;deskEls.push({key:s.id,el});el.style.left=G.x+PAD+c*CW+'px';el.style.top=G.y+PAD+r*CH+'px';
+  let st=null,mv=0,lt=0,gr=[];el.ondblclick=()=>openS(s);
   el.onpointerdown=e=>{if(e.button)return;st=[e.clientX,e.clientY];mv=0;el.setPointerCapture(e.pointerId)};
   el.onpointermove=e=>{if(!st)return;const dx=e.clientX-st[0],dy=e.clientY-st[1];if(!mv){if(Math.hypot(dx,dy)<6)return;mv=1;gr=deskEls.filter(i=>i.el.classList.contains('sel')||i.el===el).map(i=>({e:i.el,l:i.el.offsetLeft,t:i.el.offsetTop}));gr.forEach(g=>g.e.classList.add('drag'))}gr.forEach(g=>{g.e.style.left=g.l+dx+'px';g.e.style.top=g.t+dy+'px'})};
-  el.onpointerup=e=>{if(!st)return;st=null;if(!mv){if(e.pointerType==='touch'){if(Date.now()-lt<400)openApp(s.app);lt=Date.now()}return}
+  el.onpointerup=e=>{if(!st)return;st=null;if(!mv){if(e.pointerType==='touch'){if(Date.now()-lt<400)openS(s);lt=Date.now()}return}
    const tc=cl(Math.round((el.offsetLeft-G.x-PAD)/CW),0,G.c-1),tr=cl(Math.round((el.offsetTop-G.y-PAD)/CH),0,G.r-1),grp=S.desk.filter(x=>(selIds.has(x.id)||x===s)&&x.dc!=null);
    const dc=cl(tc-s.dc,-Math.min(...grp.map(x=>x.dc)),G.c-1-Math.max(...grp.map(x=>x.dc))),dr=cl(tr-s.dr,-Math.min(...grp.map(x=>x.dr)),G.r-1-Math.max(...grp.map(x=>x.dr)));
    const oth=new Set(S.desk.filter(x=>!grp.includes(x)&&x.dc!=null).map(x=>x.dc+','+x.dr)),nt=grp.map(x=>[x,x.dc+dc,x.dr+dr]);
    if(nt.every(([x,a,b])=>!oth.has(a+','+b)))nt.forEach(([x,a,b])=>{x.c=a;x.r=b});else if(grp.length===1){const f=freeCell(G,oth,tc,tr);if(f){s.c=f[0];s.r=f[1]}}
    save();desk()};
   el.oncontextmenu=e=>{e.preventDefault();e.stopPropagation();if(!selIds.has(s.id)){selIds.clear();selIds.add(s.id);paintSel()}const g=S.desk.filter(x=>selIds.has(x.id));
-   ctx(e,[['Open',()=>g.forEach(x=>openApp(x.app))],...(g.length===1?[['Rename',()=>rename(el,s)]]:[]),'sep',[g.length>1?'Remove shortcuts':'Remove shortcut',()=>{S.desk=S.desk.filter(x=>!selIds.has(x.id));selIds.clear();save();desk()}]])}})}
-function rename(el,s){const sp=$('span',el),i=document.createElement('input');i.className='in';i.value=s.name||APPS[s.app].name;sp.replaceWith(i);i.focus();i.select();let done=0;const fin=ok=>{if(done)return;done=1;if(ok){const v=i.value.trim();s.name=v&&v!==APPS[s.app].name?v:'';save()}desk()};i.onblur=()=>fin(1);i.onkeydown=e=>{e.stopPropagation();if(e.key==='Enter')fin(1);if(e.key==='Escape')fin(0)};i.onpointerdown=e=>e.stopPropagation()}
+   ctx(e,[['Open',()=>g.forEach(openS)],...(g.length===1?[['Rename',()=>rename(el,s)]]:[]),'sep',[g.length>1?'Remove shortcuts':'Remove shortcut',()=>{S.desk=S.desk.filter(x=>!selIds.has(x.id));selIds.clear();save();desk()}]])}})}
+function rename(el,s){const sp=$('span',el),i=document.createElement('input');i.className='in';i.value=s.name||(s.fsc?'':APPS[s.app].name);sp.replaceWith(i);i.focus();i.select();let done=0;const fin=ok=>{if(done)return;done=1;if(ok){const v=i.value.trim();s.name=s.fsc?(v||s.name):(v&&v!==APPS[s.app].name?v:'');save()}desk()};i.onblur=()=>fin(1);i.onkeydown=e=>{e.stopPropagation();if(e.key==='Enter')fin(1);if(e.key==='Escape')fin(0)};i.onpointerdown=e=>e.stopPropagation()}
+const openS=s=>s.fsc?window.openShortcut(s):openApp(s.app);
 function addDesk(app){const G=grid(),tk=new Set();S.desk.forEach(o=>o.dc!=null&&tk.add(o.dc+','+o.dr));for(let c=0;c<G.c;c++)for(let r=0;r<G.r;r++)if(!tk.has(c+','+r)){S.desk.push({id:Date.now(),app,name:'',c,r});save();desk();return toast('Added to desktop')}toast('Desktop is full')}
 let cx;const closeCtx=()=>{cx&&cx.remove();cx=null};
 function ctx(e,items){closeCtx();const m=cx=H('div','ctx',document.body);items.forEach(it=>{if(it==='sep')return H('i','',m);const[t,f,fl]=it,b=H('button','',m);b.textContent=t;b.disabled=fl==='dis';b.onmousedown=e=>e.preventDefault();b.onclick=()=>{closeCtx();f&&f()}});m.style.left=Math.max(6,Math.min(e.clientX,innerWidth-m.offsetWidth-6))+'px';m.style.top=Math.max(6,Math.min(e.clientY,innerHeight-m.offsetHeight-6))+'px'}
