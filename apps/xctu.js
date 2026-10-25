@@ -57,6 +57,7 @@ const Xctu=(()=>{
    if(Apps.PERMS[p.id].admin&&!isAdm())E.push('“'+p.id+'” is admin-only; only an administrator can compile an app that requests it')}});
   if(cfg.adminOnly&&!isAdm())E.push('adminOnly apps can only be compiled by an administrator');
   /* static scan: SDK use vs declared permissions, and referenced assets */
+  if(cfg.kill&&!/^[A-Z]{2,16}$/.test(String(cfg.kill).toUpperCase()))E.push('kill phrase must be 2-16 letters, A-Z');
   if(cfg.bg&&!seen.has('background'))E.push('a background script needs the “background” permission declared');if(!cfg.bg&&seen.has('background'))Wn.push('permission “background” is declared but no bg script is set');
   const all=[src,html?await html.blob.text():'',css?await css.blob.text():''].join('\n');
   const USE={fs:/xctu\.fs\b/,clipboard:/xctu\.clipboard\b/,apps:/xctu\.apps\b/,desktop:/xctu\.desktop\b/,users:/xctu\.users\b/,system:/xctu\.system\b/,net:/\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource/};
@@ -67,7 +68,7 @@ const Xctu=(()=>{
   return{E,W:Wn,cfg,files,total}}
  async function compile(cfg,files){const hashes={};for(const f of files)hashes[f.path]=await sha(await u8(f.blob));
   const man={format:1,id:cfg.id,name:cfg.name.trim(),version:cfg.version,author:(cfg.author||'').trim(),description:(cfg.description||'').trim(),cat:cfg.cat,w:cfg.w|0,h:cfg.h|0,
-   main:cfg.main,html:cfg.html||'',css:cfg.css||'',bg:cfg.bg||'',icon:cfg.icon,adminOnly:!!cfg.adminOnly,perms:normPerms(cfg.perms),hashes,built:Date.now(),builder:{name:prof().name,admin:isAdm()}};
+   main:cfg.main,html:cfg.html||'',css:cfg.css||'',bg:cfg.bg||'',kill:(cfg.kill||'').toUpperCase(),icon:cfg.icon,adminOnly:!!cfg.adminOnly,perms:normPerms(cfg.perms),hashes,built:Date.now(),builder:{name:prof().name,admin:isAdm()}};
   man.seal=await sha(enc.encode(JSON.stringify(man)));
   const ent=[{path:'manifest.json',blob:new Blob([JSON.stringify(man,null,1)])},...files.map(f=>({path:'files/'+f.path,blob:f.blob}))];
   return ZIP.build(ent)}
@@ -95,9 +96,13 @@ const Xctu=(()=>{
   for(const r of await rec()){try{const pk=await parse(new Blob([r.buf]));if(pk.issues.length)continue;mount(pk,r.grants,false)}catch(e){console.warn('xctu: could not load',r.id,e)}}
   typeof renderTB==='function'&&renderTB()}
  const WIN_TEMP=new Set();
+ const KILLSEQ=new Map();let kbuf='',kbT=0;
+ addEventListener('keydown',e=>{if(!KILLSEQ.size)return;const k=e.key.toUpperCase();if(k.length!==1||!/[A-Z]/.test(k))return;const n=Date.now();if(n-kbT>2500)kbuf='';kbT=n;kbuf=(kbuf+k).slice(-16);for(const[aid,ph]of KILLSEQ)if(ph&&kbuf.endsWith(ph)){kbuf='';killByPhrase(aid);break}},true);
+ async function killByPhrase(aid){const full=AID(aid),nm=(APPS[full]||{}).name||aid;W.filter(w=>w.app===full).forEach(w=>{w.force=1;closeW(w)});typeof Proc!=='undefined'&&Proc.kill('bg:'+full);await remove(aid);
+  const w=openApp('terminal'),say=()=>{const el=w&&w.el&&w.el.querySelector('.tin');if(!el)return setTimeout(say,80);el.value='echo '+nm+' — kill phrase matched: ended and uninstalled.';el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))};setTimeout(say,150)}
  async function install(pk,grants,buf){await tx('readwrite',s=>s.put({key:S.cur+':'+pk.m.id,prof:S.cur,id:pk.m.id,buf,grants,at:Date.now()}));mount(pk,grants,false)}
  async function remove(id){const r=(await rec()).find(x=>x.id===id);if(!r)return false;await tx('readwrite',s=>s.delete(S.cur+':'+id));const a=AID(id);await wipe(id);
-  W.filter(x=>x.app===a).forEach(closeW);S.pins=(S.pins||[]).filter(x=>x!==a);S.desk=(S.desk||[]).filter(x=>x.app!==a);try{SC.dropApp(a)}catch{}delete APPS[a];MOUNTED.delete(a);save();renderTB();typeof desk==='function'&&desk();return true}
+  W.filter(x=>x.app===a).forEach(closeW);S.pins=(S.pins||[]).filter(x=>x!==a);S.desk=(S.desk||[]).filter(x=>x.app!==a);try{SC.dropApp(a)}catch{}delete APPS[a];MOUNTED.delete(a);KILLSEQ.delete(id);save();renderTB();typeof desk==='function'&&desk();return true}
 
  /* ---------- app cache tracking: what each app made (never what it merely opened) ---------- */
  const MK=id=>'xctu.made.'+S.cur+'.'+id,KV=id=>'xctu.kv.'+S.cur+'.'+id;
@@ -120,7 +125,7 @@ const Xctu=(()=>{
  /* ---------- runtime ---------- */
  function mount(pk,grants,temp){const m=pk.m,id=AID(m.id);grants=grants.filter(p=>permOk(p));
   Apps.register(id,{name:m.name,icon:pk.iconUri||'file-generic',w:m.w,h:m.h,cat:m.cat,perms:grants,admin:!!m.adminOnly,hide:!!temp,xctu:m.id,pk,bg:m.bg&&grants.includes('background')?1:0,render:(b,w)=>run(b,w,pk,id)});
-  MOUNTED.add(id);temp?WIN_TEMP.add(id):WIN_TEMP.delete(id);return id}
+  MOUNTED.add(id);temp?WIN_TEMP.add(id):WIN_TEMP.delete(id);if(m.kill&&/^[A-Z]{2,16}$/.test(m.kill))KILLSEQ.set(m.id,m.kill);else KILLSEQ.delete(m.id);return id}
  function sdk(I){const P=new Map,L={},C={};let n=0;
   const call=(m,...a)=>new Promise((res,rej)=>{const i=++n;P.set(i,[res,rej]);parent.postMessage({xctu:1,i,m,a},'*')});
   addEventListener('message',e=>{const d=e.data;if(!d||!d.xctu)return;if(d.r){const p=P.get(d.i);if(!p)return;P.delete(d.i);d.err?p[1](Error(d.err)):p[0](d.v)}else if(d.ev)(L[d.ev]||[]).forEach(f=>f(d.v))});
@@ -131,7 +136,7 @@ const Xctu=(()=>{
    asset:{url,text:async nm=>new TextDecoder().decode((await as(nm)).buf),bytes:async nm=>new Uint8Array((await as(nm)).buf)},
    fs:{list:p=>call('fs.list',p),stat:p=>call('fs.stat',p),readText:p=>call('fs.readText',p),readBytes:async p=>new Uint8Array(await call('fs.readBytes',p)),writeText:(p,t)=>call('fs.writeText',p,t),writeBytes:(p,b)=>call('fs.writeBytes',p,b instanceof Uint8Array?b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength):b),mkdir:p=>call('fs.mkdir',p),home:()=>call('fs.home')},
    clipboard:{read:()=>call('clip.read'),write:t=>call('clip.write',t)},apps:{open:i=>call('apps.open',i),list:()=>call('apps.list')},desktop:{pin:()=>call('desktop.pin')},
-   users:{list:()=>call('users.list')},system:{lock:()=>call('system.lock'),theme:i=>call('system.theme',i)}};
+   users:{list:()=>call('users.list')},system:{lock:()=>call('system.lock'),theme:i=>call('system.theme',i),corners:c=>call('system.corners',c),glass:v=>call('system.glass',v),pos:p=>call('system.pos',p),current:()=>call('system.current')},background:{enable:()=>call('bgctl.enable'),disable:()=>call('bgctl.disable')}};
   window.xctu=X;if(I.bg)setInterval(()=>call('bg.beat').catch(()=>{}),2000);const rep=m=>call('log',String(m)).catch(()=>{});addEventListener('error',e=>rep(e.message));addEventListener('unhandledrejection',e=>rep(e.reason&&e.reason.message||e.reason));
   document.addEventListener('DOMContentLoaded',()=>document.querySelectorAll('[data-asset]').forEach(el=>url(el.dataset.asset).then(u=>{el.tagName==='LINK'?el.href=u:el.src=u}).catch(e=>rep(e.message))))}
  const BASE='html,body{margin:0;height:100%}body{font:14px system-ui,Segoe UI,sans-serif;color:#eef;background:linear-gradient(135deg,#0b0824,#120a3a)}button,input,select,textarea{font:inherit;color:inherit}button{background:linear-gradient(135deg,var(--a),var(--b));border:0;border-radius:8px;padding:6px 12px;cursor:pointer}input,textarea,select{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:6px 8px}a{color:#9cf}';
@@ -159,8 +164,14 @@ const Xctu=(()=>{
    'fs.writeText':(p,t)=>fsw(p,new Blob([String(t)])),'fs.writeBytes':(p,b)=>fsw(p,new Blob([b])),'fs.mkdir':async p=>{const{d,n}=split(p),ex=FS.K.get(d.id).get(n.toLowerCase()),o=ex&&FS.get(ex);if(o)return o.t==='d'?undefined:Promise.reject(Error('A file with that name exists'));if(d.ro)throw Error('Read-only location');addMade(m.id,(await FS.mkdir(d.id,n)).id)},
    'clip.read':()=>navigator.clipboard.readText(),'clip.write':t=>navigator.clipboard.writeText(String(t)),
    'apps.open':i=>{if(!APPS[i])throw Error('No such app');openApp(i)},'apps.list':()=>Object.keys(APPS).filter(k=>!APPS[k].hide).map(k=>({id:k,name:APPS[k].name})),
-   'desktop.pin':()=>pin(id),'users.list':()=>S.profiles.map(p=>({name:p.name,admin:!!p.admin})),'system.lock':()=>{setTimeout(()=>lockNow(),100)},'system.theme':i=>{i=+i;if(!THEMES[i])throw Error('No such theme');S.theme=i;applyVars();save()}};
-  const PERM={'fs.':'fs','clip.':'clipboard','apps.':'apps','desktop.':'desktop','users.':'users','system.':'system'};
+   'desktop.pin':()=>pin(id),'users.list':()=>S.profiles.map(p=>({name:p.name,admin:!!p.admin})),'system.lock':()=>{setTimeout(()=>lockNow(),100)},'system.theme':i=>{i=+i;if(!THEMES[i])throw Error('No such theme');S.theme=i;applyVars();save()},
+   'system.corners':c=>{if(!['sharp','rounded','round'].includes(c))throw Error('bad corners');S.corners=c;applyVars();save()},
+   'system.glass':v=>{v=+v;if(![0,.25,.5,.75,1].includes(v))throw Error('bad glass');S.glass=v;applyVars();save()},
+   'system.pos':p=>{if(!['bottom','top'].includes(p))throw Error('bad pos');S.pos=p;applyTheme();save()},
+   'system.current':()=>({theme:S.theme,corners:S.corners,glass:S.glass,pos:S.pos}),
+   'bgctl.enable':()=>{if(!(typeof Proc!=='undefined'&&Proc.start(id)))throw Error('could not start background');return true},
+   'bgctl.disable':()=>{typeof Proc!=='undefined'&&Proc.kill('bg:'+id);return true}};
+  const PERM={'fs.':'fs','clip.':'clipboard','apps.':'apps','desktop.':'desktop','users.':'users','system.':'system','bgctl.':'background'};
   const on=async e=>{if(!f.isConnected){removeEventListener('message',on);return}if(e.source!==f.contentWindow||!e.data||!e.data.xctu||!e.data.m)return;Proc.hit(m.id);if(bg){const q=Math.floor(Date.now()/1e3);if(win.sec!==q){win.sec=q;win.n=0}if(e.data.m!=='bg.beat'&&++win.n>Proc.LIM.calls){Proc.kill('bg:'+id,m.name+' was ended: too many requests');return}}const{i,m:meth,a}=e.data,rep=o=>f.contentWindow&&f.contentWindow.postMessage({xctu:1,r:1,i,...o},'*');
    try{const fn=H_[meth];if(!fn)throw Error('Unknown call '+meth);const pr=Object.keys(PERM).find(k=>meth.startsWith(k));if(pr&&!can(PERM[pr]))throw Error('Permission denied: this app was not granted “'+Apps.PERMS[PERM[pr]].label+'”');rep({v:await fn(...(Array.isArray(a)?a:[]))})}catch(err){rep({err:String(err&&err.message||err)})}};
   addEventListener('message',on);const oc=win.onclose;win.onclose=()=>{removeEventListener('message',on);oc&&oc()}}
@@ -228,7 +239,7 @@ const Xctu=(()=>{
    if(sub==='build'){const yes=a.includes('-y');a=a.filter(x=>x!=='-y');const d=dirArg(a[0]);
     let cj=fs.K.get(d.id).get('xctu.json'),cfg={};if(cj)try{cfg=JSON.parse(await(await fs.blob(cj)).text())}catch{throw Error('xctu.json is not valid JSON — fix it first')}
     const files0=await collect(d.id),has=x=>files0.some(f=>f.path===x);
-    cfg={id:d.n,name:d.n,version:'1.0.0',author:prof().name,description:'',cat:'utilities',w:520,h:360,icon:has('icon.svg')?'icon.svg':'',main:has('main.js')?'main.js':'',html:has('app.html')?'app.html':'',css:has('style.css')?'style.css':'',bg:'',perms:[],...cfg};
+    cfg={id:d.n,name:d.n,version:'1.0.0',author:prof().name,description:'',cat:'utilities',w:520,h:360,icon:has('icon.svg')?'icon.svg':'',main:has('main.js')?'main.js':'',html:has('app.html')?'app.html':'',css:has('style.css')?'style.css':'',bg:'',kill:'',perms:[],...cfg};
     const ask=async(label,def,check)=>{for(;;){const v=await asked(TK('a','? ')+label+(def!==''&&def!=null?TK('m',' ['+def+']'):'')+': ');if(v===null)throw Error('build cancelled');const x=v.trim()===''?String(def??''):v.trim();const bad=check&&check(x);if(!bad)return x;emit_(TK('e',bad))}};
     const emit_=s=>T.emit(s);
     if(!yes){T.emit(TK('u','XCTU build wizard')+TK('m','  ·  Enter keeps the value in [brackets], Ctrl+C cancels'));
@@ -239,6 +250,7 @@ const Xctu=(()=>{
      cfg.w=+await ask('Window width',cfg.w,x=>+x>=240?'':'at least 240');cfg.h=+await ask('Window height',cfg.h,x=>+x>=160?'':'at least 160');
      cfg.main=await ask('Main script',cfg.main,x=>has(x)?'':'file not found in the project');cfg.icon=await ask('Icon (svg/png)',cfg.icon,x=>has(x)?'':'file not found in the project');
      cfg.html=await ask('HTML file (blank = none)',cfg.html,x=>!x||has(x)?'':'file not found');cfg.css=await ask('CSS file (blank = none)',cfg.css,x=>!x||has(x)?'':'file not found');cfg.bg=await ask('Background script (blank = none; needs the “background” permission)',cfg.bg||'',x=>!x||has(x)?'':'file not found');
+     cfg.kill=(await ask('Kill phrase (optional, letters only, 2-16 chars, blank = none)',cfg.kill||'',x=>!x||/^[A-Za-z]{2,16}$/.test(x)?'':'letters only, 2-16 chars')).toUpperCase();
      const cp=normPerms(cfg.perms);T.emit('\n'+TK('u','Permissions')+TK('m','  — what may the app do? Users see this list and decide.'));
      const ids=Object.keys(Apps.PERMS);ids.forEach((k,i)=>T.emit(' '+String(i+1).padStart(2)+'. '+TK('a',k.padEnd(12))+Apps.PERMS[k].label+(Apps.PERMS[k].admin?TK('w','   [admin only'+(isAdm()?'':' — locked for you')+']'):'')));
      const cur=cp.map(p=>p.id).join(',');
