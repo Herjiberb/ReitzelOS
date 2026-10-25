@@ -1,16 +1,16 @@
 'use strict';
 /* ===== Reitzel OS: virtual file system (IndexedDB), My Files, Text Editor, App Store ===== */
 const FS=(()=>{
- let db;const M=new Map(),K=new Map(),SEP='/';let seq=0;const pre=Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+ let db;const L=new Set();const M=new Map(),K=new Map(),SEP='/';let seq=0;const pre=Date.now().toString(36)+Math.random().toString(36).slice(2,6);
  const nid=()=>pre+(seq++).toString(36);
  const odb=()=>new Promise((r,j)=>{const q=indexedDB.open('reitzel-fs',1);q.onupgradeneeded=()=>{q.result.createObjectStore('n',{keyPath:'id'});q.result.createObjectStore('d')};q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error)});
  const done=t=>new Promise((r,j)=>{t.oncomplete=()=>r();t.onerror=t.onabort=()=>j(t.error)});
  const split=n=>{const i=n.lastIndexOf('.');return i>0?[n.slice(0,i),n.slice(i)]:[n,'']};
  const link=m=>{M.set(m.id,m);if(m.t==='d'&&!K.has(m.id))K.set(m.id,new Map());if(m.p!=null){if(!K.has(m.p))K.set(m.p,new Map());K.get(m.p).set(m.n.toLowerCase(),m.id)}};
  const unlink=m=>{const k=K.get(m.p);if(k&&k.get(m.n.toLowerCase())===m.id)k.delete(m.n.toLowerCase())};
- async function persist(n,d,del){if(!n.length&&!d.length&&!del.length)return;const t=db.transaction(['n','d'],'readwrite'),a=t.objectStore('n'),b=t.objectStore('d');n.forEach(m=>a.put(m));d.forEach(([i,x])=>b.put(x,i));del.forEach(i=>{a.delete(i);b.delete(i)});await done(t)}
+ async function persist(n,d,del,by){if(!n.length&&!d.length&&!del.length)return;const t=db.transaction(['n','d'],'readwrite'),a=t.objectStore('n'),b=t.objectStore('d');n.forEach(m=>a.put(m));d.forEach(([i,x])=>b.put(x,i));del.forEach(i=>{a.delete(i);b.delete(i)});await done(t);const ids=[...n.map(m=>m.id),...del];L.forEach(f=>{try{f({ids,by})}catch(e){console.error(e)}})}
  const F={M,K,SEP,split,
-  get:id=>M.get(id),kids:id=>{const k=K.get(id);return k?[...k.values()].map(i=>M.get(i)):[]},
+  on(f){L.add(f);return()=>L.delete(f)},get:id=>M.get(id),kids:id=>{const k=K.get(id);return k?[...k.values()].map(i=>M.get(i)):[]},
   path(id){const a=[];while(id&&id!=='root'){const m=M.get(id);if(!m)break;a.push(m.n);id=m.p}return SEP+a.reverse().join(SEP)},
   resolve(p,from='root'){let id=p.startsWith(SEP)?'root':from;for(const s of p.split(SEP)){if(!s||s==='.')continue;if(s==='..'){id=M.get(id).p||'root';continue}const c=K.get(id)&&K.get(id).get(s.toLowerCase());if(!c)return null;id=c}return M.get(id)&&M.get(id).t==='d'?id:(M.get(id)&&p.trim()?id:null)},
   uniq(p,n,skip){const k=K.get(p);if(!k)return n;const t=x=>{const i=k.get(x.toLowerCase());return i&&i!==skip};if(!t(n))return n;const[b,e]=split(n);for(let i=2;;i++){const c=`${b} (${i})${e}`;if(!t(c))return c}},
@@ -21,10 +21,10 @@ const FS=(()=>{
    if(!M.has('root')){const now=Date.now(),ns=[{id:'root',p:null,n:'',t:'d',s:0,m:now}];link(ns[0]);for(const n of['Documents','Pictures','Downloads','Desktop']){const m={id:nid(),p:'root',n,t:'d',s:0,m:now};link(m);ns.push(m)}await persist(ns,[],[])}
    F.syncSys()},
   async mkdir(p,n,ro){const m={id:nid(),p,n:F.uniq(p,n),t:'d',s:0,m:Date.now()};if(ro)m.ro=1;link(m);await persist([m],[],[]);return m},
-  async write(p,n,blob,id,ro){let m=id&&M.get(id);if(m){m.s=blob.size;m.m=Date.now();await persist([m],[[m.id,blob]],[]);return m}
-   m={id:nid(),p,n:ro?n:F.uniq(p,n),t:'f',s:blob.size,m:Date.now()};if(ro)m.ro=1;link(m);await persist([m],[[m.id,blob]],[]);return m},
+  async write(p,n,blob,id,ro,by){let m=id&&M.get(id);if(m){m.s=blob.size;m.m=Date.now();await persist([m],[[m.id,blob]],[],by);return m}
+   m={id:nid(),p,n:ro?n:F.uniq(p,n),t:'f',s:blob.size,m:Date.now()};if(ro)m.ro=1;link(m);await persist([m],[[m.id,blob]],[],by);return m},
   async writeMany(list){const ns=[],ds=[];for(const[p,n,b]of list){const m={id:nid(),p,n:F.uniq(p,n),t:'f',s:b.size,m:Date.now()};link(m);ns.push(m);ds.push([m.id,b])}await persist(ns,ds,[]);return ns},
-  async rename(id,n){const m=M.get(id);if(!F.valid(n))throw Error('Invalid name');const c=K.get(m.p).get(n.toLowerCase());if(c&&c!==id)throw Error('That name already exists here');unlink(m);m.n=n;m.m=Date.now();link(m);await persist([m],[],[])},
+  async rename(id,n){const m=M.get(id);if(!F.valid(n))throw Error('Invalid name');const c=K.get(m.p).get(n.toLowerCase());if(c&&c!==id)throw Error('That name already exists here');unlink(m);m.n=n;link(m);await persist([m],[],[])},
   async move(ids,np){const ns=[];for(const id of ids){const m=M.get(id);if(m.p===np)continue;if(F.isIn(np,id))throw Error('Cannot move a folder into itself');unlink(m);m.p=np;m.n=F.uniq(np,m.n);link(m);ns.push(m)}await persist(ns,[],[]);return ns.length},
   async copy(ids,np){const ns=[],pairs=[];const rec=(id,p)=>{const s=M.get(id),m={id:nid(),p,n:F.uniq(p,s.n),t:s.t,s:s.s,m:Date.now()};link(m);ns.push(m);if(s.t==='d')[...K.get(id).values()].forEach(c=>rec(c,m.id));else pairs.push([id,m.id]);};
    for(const id of ids){if(F.isIn(np,id))throw Error('Cannot copy a folder into itself');rec(id,np)}
@@ -66,7 +66,7 @@ const ZIP=(()=>{const T=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(
 /* ---------- shared helpers ---------- */
 const EXT=n=>{const i=n.lastIndexOf('.');return i>0?n.slice(i+1).toLowerCase():''};
 const IMG=new Set('png jpg jpeg jpe jfif gif webp bmp svg ico avif apng cur'.split(' ')),VID=new Set('mp4 webm ogv mov m4v'.split(' ')),AUD=new Set('mp3 wav ogg oga m4a flac aac opus'.split(' '));
-const TXT=new Set('txt md markdown json js mjs css html htm xml csv tsv log ini cfg conf yml yaml toml ts tsx jsx py sh bat c h cpp hpp java rs go rb php sql svg lua srt tex'.split(' '));
+const TXT=new Set('syst txt md markdown json js mjs css html htm xml csv tsv log ini cfg conf yml yaml toml ts tsx jsx py sh bat c h cpp hpp java rs go rb php sql svg lua srt tex'.split(' '));
 const MIME={svg:'image/svg+xml',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',webp:'image/webp',bmp:'image/bmp',ico:'image/x-icon',avif:'image/avif',mp4:'video/mp4',webm:'video/webm',mp3:'audio/mpeg',wav:'audio/wav',ogg:'audio/ogg',txt:'text/plain'};
 const fmtSz=b=>b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':b<1073741824?(b/1048576).toFixed(1)+' MB':(b/1073741824).toFixed(2)+' GB';
 const fmtDt=t=>{const d=new Date(t);return d.toLocaleDateString([],{year:'numeric',month:'short',day:'numeric'})+' '+d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})};
@@ -95,11 +95,11 @@ function fileDialog(parent,o,cb){o.cb=cb;const bl=H('div','',parent.el);bl.style
 /* ---------- clipboard & thumbnails ---------- */
 const FSclip={ids:[],cut:false};
 const THC=new Map(),thq=[];let thr=0;
-function thumb(m,img,px){const k=m.id+m.m+px,c=THC.get(k);if(c){img.src=c;return}thq.push([m,img,px,k]);pump()}
+function thumb(m,img,px){const k=m.id+m.m+px,c=THC.get(k);if(c){img.src=c;img.style.objectFit='cover';img.style.borderRadius='8px';return}thq.push([m,img,px,k]);pump()}
 async function pump(){while(thr<3&&thq.length){const[m,img,px,k]=thq.shift();if(!img.isConnected)continue;thr++;(async()=>{try{const b=await FS.blob(m.id);let u=null;
  try{const bm=await createImageBitmap(b.type?b:new Blob([b],{type:MIME[EXT(m.n)]||''}),{resizeWidth:px,resizeQuality:'low'}),cv=document.createElement('canvas');cv.width=bm.width;cv.height=bm.height;cv.getContext('2d').drawImage(bm,0,0);bm.close&&bm.close();const tb=await new Promise(r=>cv.toBlob(r,'image/webp',.8));u=URL.createObjectURL(tb)}
  catch{if(b.size<8e6&&['svg','ico','cur'].includes(EXT(m.n)))u=URL.createObjectURL(new Blob([b],{type:MIME[EXT(m.n)]||'image/svg+xml'}))}
- if(u){THC.set(k,u);if(THC.size>500){const f=THC.keys().next().value;URL.revokeObjectURL(THC.get(f));THC.delete(f)}img.onerror=()=>{img.src=IC('file-image')};img.src=u}}catch{}thr--;pump()})()}}
+ if(u){THC.set(k,u);if(THC.size>500){const f=THC.keys().next().value;URL.revokeObjectURL(THC.get(f));THC.delete(f)}img.onerror=()=>{img.style.objectFit='';img.src=IC('file-image')};img.style.objectFit='cover';img.style.borderRadius='8px';img.src=u}}catch{}thr--;pump()})()}}
 /* ---------- text editor bridge ---------- */
 function openInEditor(id){const w=W.find(x=>x.app==='editor');if(w){focusW(w);w.edOpen(id)}else openApp('editor',{tab:id})}
 /* ---------- My Files ---------- */
@@ -153,7 +153,7 @@ function renderFiles(body,w,dlg){const P=S.fm||(S.fm={view:'medium',hidden:false
  function view(m){const ov=H('div','ov',fm),h=H('div','oh',ov),b=H('div','ob',ov);H('b','',h).textContent=m.n+'  ·  '+fmtSz(m.s);const x=H('button','btn',h,'Close');let url;const close=()=>{url&&URL.revokeObjectURL(url);ov.remove()};x.onclick=close;ov.tabIndex=0;ov.onkeydown=e=>{if(e.key==='Escape')close()};ov.focus();
   const bad=()=>{b.innerHTML='';const n=H('div','nop',b,`<img src="${IC('file-generic')}"><div>Could not preview this file</div>`);H('button','btn pri',n,'Open in Text Editor').onclick=()=>{close();openInEditor(m.id)}};
   FS.blob(m.id).then(bl=>{const e=EXT(m.n);url=URL.createObjectURL(bl.type?bl:new Blob([bl],{type:MIME[e]||''}));
-   if(IMG.has(e)){const i=H('img','',b);i.onerror=bad;i.src=url}else if(VID.has(e)){const v=H('video','',b);v.controls=1;v.onerror=bad;v.src=url}else if(AUD.has(e)){const a=H('audio','',b);a.controls=1;a.onerror=bad;a.src=url}else bad()})}
+   if(IMG.has(e)){const i=H('img','',b);i.onerror=bad;i.onclick=()=>i.classList.toggle('up');i.src=url}else if(VID.has(e)){const v=H('video','',b);v.controls=1;v.onerror=bad;v.src=url}else if(AUD.has(e)){const a=H('audio','',b);a.controls=1;a.onerror=bad;a.src=url}else bad()})}
  function openItem(m){if(!m)return;if(dlg){if(m.t==='d')return go(m.id);st.sel=new Set([m.id]);paint();return dlgOk()}if(m.t==='d')return go(m.id);const e=EXT(m.n);if(e==='zip')return askExtract(m);if(IMG.has(e)&&e!=='svg'||VID.has(e)||AUD.has(e))return view(m);if(TXT.has(e)||e===''||e==='svg')return e==='svg'?view(m):openInEditor(m.id);view(m)}
  /* actions */
  const err=x=>RZ.toast(x.message||String(x)),sels=()=>st.items.filter(m=>st.sel.has(m.id)),chk=()=>{if(ro()){RZ.toast('This location is read-only');return false}return true};
@@ -173,9 +173,9 @@ function renderFiles(body,w,dlg){const P=S.fm||(S.fm={view:'medium',hidden:false
    await FS.writeMany(files);reselect([root.id]);RZ.toast('Extracted '+files.length+' files')}catch(x){err(x);load()}};
  const upload=()=>{if(!chk())return;const i=document.createElement('input');i.type='file';i.multiple=true;i.onchange=async()=>{try{const ns=await FS.writeMany([...i.files].map(f=>[st.cur,f.name,f]));reselect(ns.map(m=>m.id))}catch(x){err(x)}};i.click()};
  const exportF=m=>FS.blob(m.id).then(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=m.n;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000)});
- w.fm={menu(e){if(dlg)return[['New folder',newFolder,ro()&&'dis']];const t=e.target.closest('.fi,.fr');if(!t||e.target.closest('.fm-top,.fm-side')){if(e.target.closest('.fm-top,.fm-side,.fm-st'))return[['Close',()=>closeW(w)]];st.sel.clear();paint();const r=ro();return[['New folder',newFolder,r&&'dis'],['New text file (.txt)',newText,r&&'dis'],['New zip archive…',newZip,r&&'dis'],'sep',['Paste',paste,(r||!FSclip.ids.length)&&'dis'],['Import files…',upload,r&&'dis'],'sep',['Select all',()=>{st.items.forEach(m=>st.sel.add(m.id));paint()}],['Refresh',load]]}
+ w.fm={menu(e){if(dlg)return[['New folder',newFolder,ro()&&'dis']];const t=e.target.closest('.fi,.fr');if(!t||e.target.closest('.fm-top,.fm-side')){if(e.target.closest('.fm-top,.fm-side,.fm-st'))return[['Close',()=>closeW(w)]];st.sel.clear();paint();const r=ro();return[['New folder',newFolder,r&&'dis'],['New text file (.txt)',newText,r&&'dis'],['New zip archive…',newZip,r&&'dis'],'sep',['Paste',paste,(r||!FSclip.ids.length)&&'dis'],['Import files…',upload,r&&'dis'],'sep',['Select all',()=>{st.items.forEach(m=>st.sel.add(m.id));paint()}],['Refresh',load],...(st.cur!=='root'?[['Add shortcut to this folder on desktop',()=>SC.add(FS.get(st.cur))]]:[])]}
    const m=st.items[+t.dataset.i];if(!st.sel.has(m.id)){st.sel.clear();st.sel.add(m.id);paint()}const s=sels(),one=s.length===1,lock=ro()||s.some(x=>x.ro);
-   return[['Open',()=>s.forEach(openItem)],...(one&&/\.zip$/i.test(m.n)?[['Extract here…',()=>askExtract(m)]]:[]),...(one&&m.t==='f'&&TXT.has(EXT(m.n))?[['Open in Text Editor',()=>openInEditor(m.id)]]:[]),'sep',['Cut',()=>copy(true),lock&&'dis'],['Copy',()=>copy(false)],['Paste',paste,(ro()||!FSclip.ids.length)&&'dis'],'sep',['Rename',()=>doRename(m),(!one||m.ro)&&'dis'],['Add to zip…',zipSel,ro()&&'dis'],...(one&&m.t==='f'?[['Download',()=>exportF(m)]]:[]),'sep',['Delete',del,lock&&'dis'],['Properties',()=>{const[n,sz]=m.t==='d'?FS.count(m.id):[0,m.s];modal(fm,{title:m.n,msg:`${typeOf(m)}\nLocation: ${FS.path(m.p)}\nSize: ${fmtSz(sz)}${m.t==='d'?' ('+n+' items inside)':''}\nModified: ${fmtDt(m.m)}${m.ro?'\nProtected system item':''}`,cancel:false})},'']].map(x=>x==='sep'?x:x.slice(0,3))}};
+   return[['Open',()=>s.forEach(openItem)],...(one&&/\.zip$/i.test(m.n)?[['Extract here…',()=>askExtract(m)]]:[]),...(one&&m.t==='f'&&TXT.has(EXT(m.n))?[['Open in Text Editor',()=>openInEditor(m.id)]]:[]),'sep',['Cut',()=>copy(true),lock&&'dis'],['Copy',()=>copy(false)],['Paste',paste,(ro()||!FSclip.ids.length)&&'dis'],'sep',['Rename',()=>doRename(m),(!one||m.ro)&&'dis'],['Add to zip…',zipSel,ro()&&'dis'],['Add shortcut to desktop',()=>s.forEach(x=>SC.add(x))],...(one&&m.t==='f'?[['Download',()=>exportF(m)]]:[]),'sep',['Delete',del,lock&&'dis'],['Properties',()=>{const[n,sz]=m.t==='d'?FS.count(m.id):[0,m.s];modal(fm,{title:m.n,msg:`${typeOf(m)}\nLocation: ${FS.path(m.p)}\nSize: ${fmtSz(sz)}${m.t==='d'?' ('+n+' items inside)':''}\nModified: ${fmtDt(m.m)}${m.ro?'\nProtected system item':''}`,cancel:false})},'']].map(x=>x==='sep'?x:x.slice(0,3))}};
  w.fmRefresh=()=>{if(!FS.get(st.cur))st.cur='root';load();side()};
  fm.addEventListener('keydown',e=>{if(e.target.closest('input,select,.md'))return;if(dlg&&(e.ctrlKey||e.metaKey||e.key==='Delete'||e.key==='F2'))return;const m=e.ctrlKey||e.metaKey,k=e.key.toLowerCase();
   if(m&&k==='a'){e.preventDefault();st.items.forEach(x=>st.sel.add(x.id));paint()}else if(m&&k==='c')copy(false);else if(m&&k==='x')copy(true);else if(m&&k==='v')paste();else if(e.key==='Delete')del();else if(e.key==='F2'){const s=sels();s.length===1&&doRename(s[0])}
@@ -191,29 +191,27 @@ function renderFiles(body,w,dlg){const P=S.fm||(S.fm={view:'medium',hidden:false
  if(dlg){const bar=q('.fm-dlg');bar.style.cssText='display:flex;gap:8px;align-items:center;padding:8px 10px;border-top:1px solid #ffffff14;flex:none';nameI=H('input','in',bar);nameI.style.cssText='flex:1;padding:6px 10px';nameI.value=dlg.name||'';nameI.placeholder=dlg.save?'File name':'Select a file';nameI.readOnly=!dlg.save;
   if(dlg.save){const c='.'+EXT(dlg.name||'');typeD=dropdown(DEXTS,DEXTS.some(x=>x[0]===c)?c:'');bar.append(typeD)}
   H('button','btn',bar,'Cancel').onclick=()=>closeW(w);H('button','btn pri',bar,dlg.save?'Save':'Open').onclick=dlgOk;nameI.onkeydown=e=>{e.stopPropagation();if(e.key==='Enter')dlgOk();else if(e.key==='Escape')closeW(w)};if(dlg.save)setTimeout(()=>{nameI.focus();nameI.setSelectionRange(0,FS.split(nameI.value)[0].length)},50)}
- FS.ready.then(()=>go(dlg&&dlg.dir&&FS.get(dlg.dir)?dlg.dir:'root'));
+ FS.ready.then(()=>{const t=!dlg&&w.tab&&FS.get(w.tab);if(t){if(t.t==='d')go(t.id);else{go(t.p||'root');st.sel=new Set([t.id]);paint();openItem(t)}}else go(dlg&&dlg.dir&&FS.get(dlg.dir)?dlg.dir:'root')});
 }
 /* ---------- Text Editor ---------- */
 function renderEditor(body,w){body.innerHTML=`<div class=ed><div class=ed-side><div class=ed-sh>Open files</div><div class=ed-tabs></div><div style="padding:8px"><button class="btn nw" style="width:100%">+ New file</button></div></div><div class=ed-main><div class=ed-bar><button class=bn>New</button><button class=bo>Open</button><button class=bs>Save</button><button class=ba>Save As</button><span class=sp></span><button class=bf>Find</button><button class=bw>Wrap</button><button class=bm>A−</button><span class=fsz></span><button class=bp>A+</button></div>
-<div class=ed-find><input class="in fi1" placeholder="Find"><input class="in fi2" placeholder="Replace"><button class=fp>↑</button><button class=fn>↓</button><button class=fc title="Match case">Aa</button><button class=fr1>Replace</button><button class=fra>All</button><small class=fk></small><button class=fx>✕</button></div><div class=ed-warn></div>
+<div class=ed-find><input class="in fi1" placeholder="Find"><input class="in fi2" placeholder="Replace"><button class=fp>↑</button><button class=fn>↓</button><button class=fc title="Match case">Aa</button><button class=fr1>Replace</button><button class=fra>All</button><small class=fk></small><button class=fx>✕</button></div><div class=ed-warn></div><div class=ed-upd><span></span><button class=ur>Reload</button><button class=uk>Keep editing</button></div>
 <div class=ed-area><div class=ed-gut><pre></pre></div><div class=ed-ta><textarea spellcheck=false wrap=off></textarea><div class=ed-hl></div></div></div><div class=ed-stat><span class=s1></span><span class=s2></span><span class=sp></span><span class=s3></span></div></div></div>`;
  const q=s=>$(s,body),ed=q('.ed'),ta=q('textarea'),gut=q('.ed-gut pre'),tabs=q('.ed-tabs'),fb=q('.ed-find'),f1=q('.fi1'),f2=q('.fi2'),hl=q('.ed-hl'),taw=q('.ed-ta'),warn=q('.ed-warn');
  let docs=[],cur=null,uid=1,fs=13,lh=20,ver=0,lowV=-1,low='',cs=false,wrap=false,ft=0,rq=0,hlm=null;
  const mkdoc=o=>({id:uid++,fid:null,name:'Untitled.txt',dirty:false,bin:false,ro:false,sc:0,sl:0,ss:0,se:0,text:'',...o});
  const sync=()=>{if(cur){cur.text=ta.value;cur.sc=ta.scrollTop;cur.sl=ta.scrollLeft;cur.ss=ta.selectionStart;cur.se=ta.selectionEnd}};
- function tabsDraw(){tabs.innerHTML='';docs.forEach(d=>{const t=H('div','ed-tab'+(d===cur?' on':''),tabs,`${d.dirty?'<i></i>':''}<span></span><button>×</button>`);$('span',t).textContent=d.name;t.title=d.fid?FS.path(d.fid):'Unsaved file';t.onclick=e=>{if(e.target.closest('button'))closeDoc(d);else show(d)}})}
+ function tabsDraw(){tabs.innerHTML='';docs.forEach(d=>{const t=H('div','ed-tab'+(d===cur?' on':''),tabs,`${d.stale?'<i style="background:#ffb300"></i>':d.dirty?'<i></i>':''}<span></span><button>×</button>`);$('span',t).textContent=d.name;t.title=d.fid?FS.path(d.fid):'Unsaved file';t.onclick=e=>{if(e.target.closest('button'))closeDoc(d);else show(d)}})}
  const bytes=s=>{const u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u};
  const latin=u=>{let s='';for(let i=0;i<u.length;i+=32768)s+=String.fromCharCode.apply(null,u.subarray(i,i+32768));return s};
- function show(d){sync();cur=d;ta.value=d.text;ta.readOnly=d.ro;ta.scrollTop=d.sc;ta.scrollLeft=d.sl;ta.setSelectionRange(d.ss,d.se);ver++;warn.style.display=d.bin?'block':'none';warn.textContent=d.ro?'Binary file preview (truncated, read-only). Use Save As to keep a copy.':'Binary file — contents are shown as raw characters; editing may corrupt it.';tabsDraw();upd();ta.focus()}
+ function show(d){sync();cur=d;ta.value=d.text;ta.readOnly=d.ro;ta.scrollTop=d.sc;ta.scrollLeft=d.sl;ta.setSelectionRange(d.ss,d.se);ver++;warn.style.display=d.bin?'block':'none';warn.textContent=d.ro?'Binary file preview (truncated, read-only). Use Save As to keep a copy.':'Binary file — contents are shown as raw characters; editing may corrupt it.';tabsDraw();banner();upd();ta.focus()}
  function add(d){docs.push(d);show(d);return d}
- w.edOpen=async id=>{const ex=docs.find(d=>d.fid===id);if(ex)return show(ex);const m=FS.get(id);if(!m)return;const b=await FS.blob(id);let txt,bin=false,ro=false;const big=b.size>4e6;
-  const u=new Uint8Array(await b.slice(0,8192).arrayBuffer());bin=u.includes(0);
-  if(bin){const sl=b.size>4e6?b.slice(0,4e6):b;ro=b.size>4e6;txt=latin(new Uint8Array(await sl.arrayBuffer()))}else txt=await b.text();
-  if(cur&&!cur.fid&&!cur.dirty&&!cur.text&&docs.length===1)docs=[];add(mkdoc({fid:id,name:m.n,text:txt,bin,ro:ro||m.ro}))};
+ async function readDoc(id){const m=FS.get(id),b=await FS.blob(id),u=new Uint8Array(await b.slice(0,8192).arrayBuffer()),bin=u.includes(0);let txt,ro=false;if(bin){ro=b.size>4e6;txt=latin(new Uint8Array(await(ro?b.slice(0,4e6):b).arrayBuffer()))}else txt=await b.text();return{txt,bin,ro:ro||!!m.ro,mt:m.m}}
+ w.edOpen=async id=>{const ex=docs.find(d=>d.fid===id);if(ex)return show(ex);const m=FS.get(id);if(!m)return;const r=await readDoc(id);if(cur&&!cur.fid&&!cur.dirty&&!cur.text&&docs.length===1)docs=[];add(mkdoc({fid:id,name:m.n,text:r.txt,bin:r.bin,ro:r.ro,mt:r.mt}))};
  const lines=()=>{const v=ta.value;let n=1,i=-1;while((i=v.indexOf('\n',i+1))>=0)n++;return n};
  function gutter(){rq=0;const g=gut.parentNode;g.style.display=wrap?'none':'';if(wrap)return;const n=lines(),f=Math.floor(ta.scrollTop/lh),c=Math.ceil(ta.clientHeight/lh)+1,a=[];for(let i=f;i<Math.min(n,f+c);i++)a.push(i+1);gut.textContent=a.join('\n');gut.style.transform=`translateY(${-(ta.scrollTop%lh)+f*lh-f*lh}px)`;g.style.width=Math.max(44,String(n).length*9+22)+'px'}
  function pos(){const p=ta.selectionStart,v=ta.value;let ln=1,i=-1;while((i=v.indexOf('\n',i+1))>=0&&i<p)ln++;q('.s1').textContent=`Ln ${ln}, Col ${p-v.lastIndexOf('\n',p-1)}`}
- function upd(){q('.s2').textContent=ta.value.length.toLocaleString()+' chars';q('.s3').textContent=(cur.bin?'Binary · ':'')+(cur.dirty?'Unsaved':'Saved');q('.bw').classList.toggle('on',wrap);q('.bf').classList.toggle('on',fb.classList.contains('show'));pos();if(!rq)rq=requestAnimationFrame(gutter);hlDraw()}
+ function upd(){if(!cur)return;q('.s2').textContent=ta.value.length.toLocaleString()+' chars';q('.s3').textContent=(cur.bin?'Binary · ':'')+(cur.dirty?'Unsaved':'Saved');q('.bw').classList.toggle('on',wrap);q('.bf').classList.toggle('on',fb.classList.contains('show'));pos();if(!rq)rq=requestAnimationFrame(gutter);hlDraw()}
  let ut=0;ta.addEventListener('input',()=>{if(!cur.dirty){cur.dirty=true;tabsDraw()}ver++;clearTimeout(ut);ut=setTimeout(()=>{upd();count()},120);if(!rq)rq=requestAnimationFrame(gutter)});
  ta.addEventListener('scroll',()=>{if(!rq)rq=requestAnimationFrame(gutter);hlDraw()});['keyup','click','pointerup'].forEach(e=>ta.addEventListener(e,()=>{clearTimeout(ut);ut=setTimeout(upd,60)}));
  ta.addEventListener('pointerdown',()=>{hlm=null;hl.style.display='none'});
@@ -223,13 +221,20 @@ function renderEditor(body,w){body.innerHTML=`<div class=ed><div class=ed-side><
  /* files */
  const err=x=>RZ.toast(x.message||String(x)),content=d=>d.bin?new Blob([bytes(d.text)]):new Blob([d.text]);
  async function save(d,as){sync();if(d.ro&&!as)return RZ.toast('Read-only — use Save As');
-  if(d.fid&&!as&&FS.get(d.fid)&&!FS.get(d.fid).ro){try{await FS.write(null,null,content(d),d.fid);d.dirty=false;tabsDraw();upd();W.forEach(x=>x.fmRefresh&&x.fmRefresh());RZ.toast('Saved')}catch(x){err(x)}return}
-  const m=d.fid&&FS.get(d.fid);fileDialog(w,{title:'Save As',save:true,name:d.name,dir:m&&!m.ro?m.p:(FS.resolve('/Documents')||'root')},async r=>{try{const ex=FS.K.get(r.dir).get(r.name.toLowerCase());const go=async()=>{const f=ex?await FS.write(null,null,content(d),ex):await FS.write(r.dir,r.name,content(d));d.fid=f.id;d.name=f.n;d.dirty=false;d.ro=false;tabsDraw();upd();W.forEach(x=>x.fmRefresh&&x.fmRefresh());RZ.toast('Saved '+f.n)};
+  if(d.fid&&!as&&FS.get(d.fid)&&!FS.get(d.fid).ro){try{const f=await FS.write(null,null,content(d),d.fid,0,'editor:'+w.id);d.mt=f.m;d.stale=null;d.dirty=false;tabsDraw();upd();W.forEach(x=>x.fmRefresh&&x.fmRefresh());RZ.toast('Saved')}catch(x){err(x)}return}
+  const m=d.fid&&FS.get(d.fid);fileDialog(w,{title:'Save As',save:true,name:d.name,dir:m&&!m.ro?m.p:(FS.resolve('/Documents')||'root')},async r=>{try{const ex=FS.K.get(r.dir).get(r.name.toLowerCase());const go=async()=>{const f=ex?await FS.write(null,null,content(d),ex,0,'editor:'+w.id):await FS.write(r.dir,r.name,content(d),null,0,'editor:'+w.id);d.fid=f.id;d.mt=f.m;d.stale=null;d.name=f.n;d.dirty=false;d.ro=false;tabsDraw();upd();W.forEach(x=>x.fmRefresh&&x.fmRefresh());RZ.toast('Saved '+f.n)};
    go()}catch(x){err(x)}})}
  function closeDoc(d){const fin=()=>{const i=docs.indexOf(d);docs.splice(i,1);if(!docs.length)add(mkdoc());else if(d===cur){cur=null;show(docs[Math.min(i,docs.length-1)])}else tabsDraw()};if(d.dirty){if(d===cur)sync();modal(ed,{title:'Unsaved changes',msg:`Save changes to “${d.name}”?`,btns:['Don’t save','Save'],cancel:true},async l=>{if(l==='Save'){await save(d);if(d.dirty)return}fin()})}else fin()}
  const openDlg=()=>fileDialog(w,{title:'Open file',dir:cur&&cur.fid&&FS.get(cur.fid)?FS.get(cur.fid).p:FS.resolve('/Documents')||'root'},r=>w.edOpen(r.id));
  const newDoc=()=>add(mkdoc());
  q('.bn').onclick=q('.nw').onclick=newDoc;q('.bo').onclick=openDlg;q('.bs').onclick=()=>save(cur);q('.ba').onclick=()=>save(cur,1);
+ /* external-change detection */
+ const upB=q('.ed-upd');
+ function banner(){const s=cur&&cur.stale;upB.classList.toggle('show',!!s);if(!s)return;const who=s.by&&s.by.startsWith('editor:')?'another Text Editor window':s.by==='desk'?'the desktop':'another app or window';
+  $('span',upB).textContent=s.gone?`“${cur.name}” was deleted or moved elsewhere.`:`“${cur.name}” was updated by ${who}.${cur.dirty?' Reloading will discard your unsaved edits.':''}`;q('.ur').style.display=s.gone?'none':''}
+ q('.uk').onclick=()=>{const d=cur;if(d.stale.gone){d.fid=null;d.dirty=true}else d.mt=FS.get(d.fid).m;d.stale=null;banner();tabsDraw();upd()};
+ q('.ur').onclick=async()=>{const d=cur;if(!d.fid||!FS.get(d.fid))return;const r=await readDoc(d.fid);Object.assign(d,{text:r.txt,bin:r.bin,ro:r.ro,mt:r.mt,dirty:false,stale:null});if(d===cur){const sl=ta.scrollTop;ta.value=d.text;ta.readOnly=d.ro;ta.scrollTop=sl;ver++;hlm=null;hl.style.display='none';warn.style.display=d.bin?'block':'none'}banner();tabsDraw();upd();RZ.toast('Reloaded')};
+ w.onclose=FS.on(ev=>{let ch=0;for(const d of docs){if(!d.fid||!ev.ids.includes(d.fid))continue;const m=FS.get(d.fid);ch=1;if(!m){d.stale={gone:1};continue}if(m.n!==d.name)d.name=m.n;if(m.m!==d.mt){if(ev.by==='editor:'+w.id)d.mt=m.m;else d.stale={by:ev.by}}}if(ch&&cur){tabsDraw();banner()}});
  /* find / replace */
  const lowT=()=>{if(lowV!==ver){low=ta.value.toLowerCase();lowV=ver}return low};
  const hay=()=>cs?ta.value:lowT(),nd=()=>cs?f1.value:f1.value.toLowerCase();
@@ -272,6 +277,23 @@ function renderStore(body){body.innerHTML=`<div class=st><div class=st-nav><h2><
   if(tab==='d'){const s=H('input','in',main);s.placeholder='Search apps';s.value=qy;s.oninput=()=>{qy=s.value;list()};H('h3','',main).textContent='Discover';const g=H('div','st-grid',main);const list=()=>{g.innerHTML='';const r=CATALOG.filter(a=>(a.name+a.tagline+a.tag).toLowerCase().includes(qy.toLowerCase()));r.forEach(a=>card(a,g));if(!r.length)H('div','st-empty',g,'No apps found')};list();s.onkeydown=e=>e.stopPropagation()}
   else{H('h3','',main).textContent='Installed';const l=CATALOG.filter(a=>inst()[a.id]);if(!l.length)H('div','st-empty',main,'No apps installed yet');l.forEach(a=>{const r=H('div','st-row',main,`<img src="${IC(a.icon)}"><div><b></b><br><small style="opacity:.6"></small></div>`);$('b',r).textContent=a.name;$('small',r).textContent='Version '+inst()[a.id];H('button','btn',r,'Details').onclick=()=>{sel=a;draw()};H('button','btn dng',r,'Uninstall').onclick=()=>{uninstall(a.id);draw()}})}}
  draw()}
+/* ---------- desktop shortcuts (/Desktop/shortcuts.syst) ---------- */
+const SC=(()=>{const NAME='shortcuts.syst';let items=[],bad=false,last='',fid=null,q=Promise.resolve(),lt=0;
+ const dId=()=>FS.K.get('root').get('desktop'),fileId=()=>{const d=dId();return d&&FS.K.get(d).get(NAME)||null};
+ const ok=j=>j&&typeof j==='object'&&j.format==='reitzel-shortcuts'&&Array.isArray(j.shortcuts)&&j.shortcuts.every(s=>s&&typeof s==='object'&&typeof s.name==='string'&&s.name&&typeof s.target==='string'&&s.target[0]==='/'&&(s.kind==='file'||s.kind==='folder')&&Number.isInteger(s.c)&&Number.isInteger(s.r)&&s.c>=0&&s.r>=0);
+ const mk=(s,i)=>{const id=FS.resolve(s.target),m=id&&FS.get(id);return{id:'f'+i+'_'+s.target,fsc:1,app:'__sc',name:s.name,path:s.target,kind:s.kind,c:s.c,r:s.r,icon:m?iconOf(m):(s.kind==='folder'?'folder':'file-generic')}};
+ const ser=l=>JSON.stringify({format:'reitzel-shortcuts',version:1,shortcuts:l.map(x=>({name:x.name,target:x.path,kind:x.kind,c:x.c,r:x.r}))},null,2);
+ last=ser([]);
+ const redraw=()=>{try{if(S&&S.desk)desk()}catch{}};
+ async function load(){bad=false;fid=fileId();let list=[];if(fid){try{const j=JSON.parse(await(await FS.blob(fid)).text());if(ok(j))list=j.shortcuts.map(mk);else bad=true}catch{bad=true}}items=list;last=bad?'':ser(items);redraw()}
+ function write(){if(bad)return;const s=ser(items);if(s===last)return;last=s;q=q.then(async()=>{const f=fileId(),b=new Blob([s]);if(f)await FS.write(null,null,b,f,0,'desk');else{let d=dId();if(!d)d=(await FS.mkdir('root','Desktop')).id;await FS.write(d,NAME,b,null,0,'desk')}fid=fileId()}).catch(console.error)}
+ window.deskPre=()=>{S.desk=S.desk.filter(x=>!x.fsc).concat(items)};
+ window.deskHook=()=>{if(!S||!S.desk)return;items=S.desk.filter(x=>x.fsc);write()};
+ window.openShortcut=s=>{const id=FS.resolve(s.path),m=id&&FS.get(id);if(!m)return RZ.toast('Shortcut target not found: '+s.path);const e=EXT(m.n);if(m.t==='f'&&e!=='svg'&&(TXT.has(e)||!e))openInEditor(id);else openApp('files',{tab:id})};
+ FS.ready.then(()=>{load();FS.on(ev=>{if(ev.by==='desk')return;if(fileId()!==fid||(fid&&ev.ids.includes(fid))||items.some(x=>ev.ids.includes(FS.resolve(x.path)))){clearTimeout(lt);lt=setTimeout(load,60)}})});
+ return{add(m){if(!m)return;if(bad)return RZ.toast('shortcuts.syst is malformed — fix or delete it first');const path=FS.path(m.id);if(items.some(x=>x.path===path))return RZ.toast('Already on the desktop');
+  const G=grid(),tk=new Set();S.desk.forEach(o=>o.dc!=null&&tk.add(o.dc+','+o.dr));let pos=null;for(let c=0;c<G.c&&!pos;c++)for(let r=0;r<G.r;r++)if(!tk.has(c+','+r)){pos=[c,r];break}if(!pos)return RZ.toast('Desktop is full');
+  const it=mk({name:m.n,target:path,kind:m.t==='d'?'folder':'file',c:pos[0],r:pos[1]},items.length+Date.now());items.push(it);S.desk.push(it);write();desk();RZ.toast('Shortcut added to desktop')}}})();
 /* ---------- register ---------- */
 Object.assign(APPS.files,{name:'My Files',icon:'folder',w:900,h:560,render:renderFiles,ctx:(e,w)=>w.fm?w.fm.menu(e):null});
 APPS.editor={name:'Text Editor',icon:'editor',w:880,h:560,render:renderEditor};
