@@ -37,7 +37,7 @@ const FS=(()=>{
   search(root,q,hidden,limit=20000){q=q.toLowerCase();const out=[],st=[root];while(st.length&&out.length<limit){const d=st.pop();const k=K.get(d);if(!k)continue;for(const[ln,id]of k){if(!hidden&&ln[0]==='.')continue;if(!canR(M.get(id)))continue;if(ln.includes(q))out.push(M.get(id));const m=M.get(id);if(m.t==='d')st.push(id)}}return out},
   count(id){let n=0,sz=0;const st=[id];while(st.length){const k=K.get(st.pop());if(k)for(const c of k.values()){const m=M.get(c);if(!canR(m))continue;n++;sz+=m.s||0;if(m.t==='d')st.push(c)}}return[n,sz]},
   async syncSys(){try{let sys=M.get(K.get('root').get('.system'));let as=K.get(sys.id).get('assets');as=as?M.get(as):await R.mkdir(sys.id,'assets',1);
-   const files=['index.html','style.css','os.js','apps.js','sw.js'],assets=['reitzel','folder','folder-single','compass-settings','network','editor','file-image','file-generic','file-scout','tote-store','terminal'].map(x=>x+'-icon.svg');
+   const files=['index.html','style.css','os.js','apps.js','apps2.js','sw.js'],assets=['reitzel','folder','folder-single','compass-settings','network','editor','file-image','file-generic','file-scout','tote-store','terminal','cloud-export'].map(x=>x+'-icon.svg');
    for(const[par,list,pf]of[[sys,files,''],[as,assets,'assets/']])for(const f of list){try{const r=await fetch(pf+f);if(!r.ok)continue;const b=await r.blob(),old=K.get(par.id).get(f);
     if(old&&M.get(old).s===b.size)continue;if(old)await R.write(null,f,b,old);else await R.write(par.id,f,b,null,1)}catch{}}
    }catch(e){console.error('sys sync',e)}}
