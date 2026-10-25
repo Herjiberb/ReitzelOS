@@ -1,5 +1,5 @@
 'use strict';
-const CACHE_NAME='reitzel-v7';
+const CACHE_NAME='reitzel-v8';
 const FILES=['./','./index.html','./style.css','./os.js','./apps/base.js','./apps/fs.js','./apps/files.js','./apps/editor.js','./apps/store.js','./apps/shortcuts.js','./apps/openwith.js','./apps/file-scout.js','./apps/terminal.js','./apps/cloud-export.js','./apps/browser.js','./assets/reitzel-icon.svg','./assets/folder-icon.svg','./assets/compass-settings-icon.svg','./assets/network-icon.svg','./assets/cloud-export-icon.svg','./assets/browser-icon.svg'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE_NAME).map(x=>caches.delete(x)))).then(()=>self.clients.claim())));
