@@ -5,6 +5,7 @@ const MEDIA=m=>m.t==='f'&&(IMG.has(EXT(m.n))||VID.has(EXT(m.n))||AUD.has(EXT(m.n
 const OPENERS=[
  {id:'editor',name:'Text Editor',icon:'editor',test:m=>m.t==='f',open:m=>openInEditor(m.id)},
  {id:'files',name:'My Files',icon:'folder',test:m=>m.t==='d'||MEDIA(m)||EXT(m.n)==='zip',open:m=>openApp(fmApp(),{tab:m.id})},
+ {id:'spotweb',name:'Spot The Web',icon:'browser',test:m=>m.t==='f'&&/^(html?|xhtml|svg)$/.test(EXT(m.n)),open:m=>openApp('spotweb',{tab:'file://'+encodeURI(FS.path(m.id))}),need:'spotweb'},
  {id:'file-scout',name:'File Scout',icon:'file-scout',test:m=>m.t==='d'||MEDIA(m),open:m=>openApp('file-scout',{tab:m.id}),need:'file-scout'},
  {id:'terminal',name:'Terminal',icon:'terminal',test:m=>m.t==='d',open:m=>openApp('terminal',{tab:{cwd:m.id}})}];
 const openersFor=ms=>OPENERS.filter(o=>(!o.admin||Apps.isAdmin())&&(!o.need||APPS[o.need])&&ms.every(o.test));
