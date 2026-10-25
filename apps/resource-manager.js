@@ -1,6 +1,6 @@
 'use strict';
 /* =====================================================================
-   apps/resource-manager.js — Resource Manager (Ctrl+Esc) + background/startup engine
+   apps/resource-manager.js — Resource Manager (Ctrl+Alt+` or double-tap Right Ctrl) + background/startup engine
    ---------------------------------------------------------------------
    Proc      process table for background tasks, startup list, kill switch
    Built-in apps opt in with   def.bg = { every:ms, tick(ctx), start?(ctx), stop?(ctx) }
@@ -54,7 +54,7 @@ const RM=(()=>{
  const rows=()=>{const n=Date.now(),r=[];
   W.forEach(w=>{const a=APPS[w.app]||{name:w.app,icon:'file-generic'},x=a.xctu;r.push({key:'w'+w.id,icon:a.icon,name:a.name+(W.filter(q=>q.app===w.app).length>1?' #'+w.id:''),type:'Window',st:w.min?'Minimized':w.el.classList.contains('foc')?'Active':'Running',up:up(n-(w.t0||n)),load:w.el.getElementsByTagName('*').length+' nodes'+(x?' · '+(Proc.hits.get(w.app.replace(/^xctu-/,''))||0)+' calls':''),kill:()=>Proc.killWin(w)})});
   Proc.T.forEach(t=>r.push({key:t.key,icon:t.icon,name:t.name,type:'Background',st:t.state==='throttled'?'Throttled':'Running',tip:t.err,up:up(n-t.t0),load:t.kind==='xctu'?(Proc.hits.get(t.app.replace(/^xctu-/,''))||0)+' calls':t.ticks+' ticks · '+Math.round(t.cpu)+' ms',kill:()=>Proc.kill(t.key)}));
-  r.push({key:'rm',icon:'compass-settings',name:'Resource Manager',type:'System',st:'Running',up:up(n-t0),load:el?el.getElementsByTagName('*').length+' nodes':'',kill:()=>{close();toast('Resource Manager ended — press Ctrl+Esc to start it again')}});return r};
+  r.push({key:'rm',icon:'compass-settings',name:'Resource Manager',type:'System',st:'Running',up:up(n-t0),load:el?el.getElementsByTagName('*').length+' nodes':'',kill:()=>{close();toast('Resource Manager ended — press Ctrl+Alt+` (or double-tap Right Ctrl) to start it again')}});return r};
  function paintProc(m){let tb=m.querySelector('tbody');if(!tb){m.innerHTML='<table><thead><tr><th>Process</th><th>Type</th><th>Status</th><th>Running</th><th>Load</th><th></th></tr></thead><tbody></tbody></table>';tb=m.querySelector('tbody');
    tb.onclick=e=>{const b=e.target.closest('.k');if(!b)return;const r=b._r||rows().find(x=>x.key===b.closest('tr').dataset.k);r&&r.kill();paint()}}
   const data=rows(),have=new Map([...tb.children].map(tr=>[tr.dataset.k,tr]));
@@ -79,6 +79,10 @@ const RM=(()=>{
   paintProc($('main',el));paint();iv=setInterval(paint,1000)}
  function close(){clearInterval(iv);el&&el.remove();el=null}
  const toggle=()=>el?close():show();
- addEventListener('keydown',e=>{if(e.key==='Escape'&&e.ctrlKey&&typeof L!=='undefined'&&L.classList.contains('hide')){e.preventDefault();e.stopPropagation();toggle()}},true);
+ /* Hotkeys (no Esc, so the browser never leaves immersive mode): Ctrl+Alt+` , or double-tap Right Ctrl */
+ let rcT=0;const idle=()=>typeof L!=='undefined'&&L.classList.contains('hide');
+ addEventListener('keydown',e=>{if(!idle())return;
+  if(e.ctrlKey&&e.altKey&&!e.shiftKey&&!e.metaKey&&e.code==='Backquote'){e.preventDefault();e.stopPropagation();toggle();return}
+  if(e.code==='ControlRight'&&!e.repeat){const n=performance.now();if(n-rcT<450){rcT=0;e.preventDefault();toggle()}else rcT=n}else if(e.code!=='ControlRight')rcT=0},true);
  return{show,close,toggle}
 })();
