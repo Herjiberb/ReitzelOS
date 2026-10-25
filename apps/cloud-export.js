@@ -20,16 +20,16 @@ Apps.style('cloud-export',`
 .cx-row .tg{width:18px;height:18px;border:0;background:none;color:#7d8597;cursor:pointer;padding:0;font-size:10px;flex:none;border-radius:5px}.cx-row .tg:hover{background:#ffffff14;color:#fff}
 .cx-row img{width:16px;height:16px;flex:none}
 .cx-row .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cx-row .sz{color:#6b7385;font-size:11.5px;flex:none}
-.cx input[type=checkbox]:not(.sw){appearance:none;-webkit-appearance:none;width:16px;height:16px;border-radius:5px;border:1.5px solid #4a5163;background:transparent;margin:0;flex:none;cursor:pointer;transition:.12s;display:grid;place-items:center}
-.cx input[type=checkbox]:not(.sw):hover{border-color:#8b93a5}
-.cx input[type=checkbox]:not(.sw):checked,.cx input[type=checkbox]:not(.sw):indeterminate{background:var(--a,#3700ff);border-color:transparent}
-.cx input[type=checkbox]:not(.sw):checked::after{content:"";width:8px;height:4px;border:2px solid #fff;border-top:0;border-right:0;transform:rotate(-45deg) translate(1px,-1px)}
-.cx input[type=checkbox]:not(.sw):indeterminate::after{content:"";width:8px;height:2px;background:#fff;border-radius:2px}
+.cx input.cx-cb{appearance:none;-webkit-appearance:none;width:16px;height:16px;min-width:16px;border-radius:5px;border:1.5px solid #4a5163;background:transparent no-repeat center/11px;margin:0;flex:none;cursor:pointer;transition:background-color .12s,border-color .12s;position:static}
+.cx input.cx-cb::after{content:none;display:none}
+.cx input.cx-cb:hover{border-color:#8b93a5}
+.cx input.cx-cb:checked{background-color:var(--a,#3700ff);border-color:transparent;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.3l2.4 2.4 4.6-5' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")}
+.cx input.cx-cb:indeterminate{background-color:var(--a,#3700ff);border-color:transparent;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 6h6' stroke='white' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E")}
 .cx-set{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 8px;border-radius:9px}.cx-set+.cx-set{border-top:1px solid #ffffff08}
 .cx-set b{font-weight:550;display:block;color:#eef0f6;font-size:13px}.cx-set small{color:#7d8597;font-size:11.5px;display:block;line-height:1.35}
 .cx .cx-f{border:1px solid #ffffff1a;background:#0c0e13;color:#e8eaf0;border-radius:8px;padding:6px 9px;font:inherit;font-size:12.5px;min-width:150px;max-width:170px;outline:0;transition:border-color .12s}.cx .cx-f:focus{border-color:var(--a,#3700ff)}
-.cx input.sw{appearance:none;-webkit-appearance:none;width:34px;height:20px;border-radius:99px;background:#2b3040;position:relative;cursor:pointer;transition:.15s;flex:none;margin:0}
-.cx input.sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#cfd4e0;transition:.15s}.cx input.sw:checked{background:var(--a,#3700ff)}.cx input.sw:checked::after{left:16px;background:#fff}
+.cx input.cx-sw{appearance:none;-webkit-appearance:none;width:34px;height:20px;border-radius:99px;background:#2b3040;position:relative;cursor:pointer;transition:.15s;flex:none;margin:0}
+.cx input.cx-sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#cfd4e0;transition:.15s}.cx input.cx-sw:checked{background:var(--a,#3700ff)}.cx input.cx-sw:checked::after{left:16px;background:#fff}
 .cx-ft{flex:none;border-top:1px solid #ffffff12;padding:12px 20px 14px;background:#0f1218;position:relative}
 .cx-go{display:flex;align-items:center;gap:12px}.cx-go .info{flex:1;min-width:0}.cx-go .info b{font-size:14.5px;color:#fff;font-weight:600}.cx-go .info small{display:block;color:#7d8597;font-size:12px}
 .cx-bar{position:absolute;left:0;right:0;top:-1px;height:2px;background:#ffffff10;overflow:hidden;display:none}.cx-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--a,#3700ff),var(--b,#a600ff));transition:width .15s}
@@ -75,7 +75,7 @@ function renderCloud(body,w){
  const toggle=(id,on)=>{const m=FS.get(id);if(!m)return;const f=x=>on?chk.add(x):chk.delete(x);f(id);if(m.t==='d')all(id,k=>f(k.id))};
  function draw(){tree.innerHTML='';const walk=(id,depth)=>{for(const m of kids(id)){const r=H('div','cx-row',tree);r.style.paddingLeft=6+depth*18+'px';
    const tg=H('button','tg',r,m.t==='d'?(open.has(m.id)?'▾':'▸'):'');if(m.t==='d')tg.onclick=()=>{open.has(m.id)?open.delete(m.id):open.add(m.id);draw()};
-   const cb=H('input','',r);cb.type='checkbox';
+   const cb=H('input','cx-cb',r);cb.type='checkbox';
    if(m.t==='d'){const[c,t]=stat(m.id);cb.checked=t?c===t:chk.has(m.id);cb.indeterminate=c>0&&c<t}else cb.checked=chk.has(m.id);
    cb.onchange=()=>{toggle(m.id,cb.checked);draw();sum()};
    H('img','',r).src=IC(m.t==='d'?'folder-single':'file-generic');H('span','nm',r).textContent=m.n;if(m.t==='f')H('span','sz',r).textContent=fmtSz(m.s||0);
@@ -95,7 +95,7 @@ function renderCloud(body,w){
  /* settings */
  const sets=q('.sets');
  const row=(t,d,el)=>{const r=H('div','cx-set',sets,`<div><b></b><small></small></div>`);r.querySelector('b').textContent=t;r.querySelector('small').textContent=d;r.append(el);return el};
- const tgl=(k,t,d)=>{const e=H('input','sw');e.type='checkbox';e.checked=!!cfg[k];e.onchange=()=>{cfg[k]=e.checked;save();sum()};row(t,d,e)};
+ const tgl=(k,t,d)=>{const e=H('input','cx-sw');e.type='checkbox';e.checked=!!cfg[k];e.onchange=()=>{cfg[k]=e.checked;save();sum()};row(t,d,e)};
  const sel=(k,t,d,opts,num)=>{const e=H('select','cx-f');opts.forEach(([v,l])=>{const o=H('option','',e);o.value=v;o.textContent=l});e.value=cfg[k];e.onchange=()=>{cfg[k]=num?+e.value:e.value;save();sum()};row(t,d,e)};
  const txt=(k,t,d,ph)=>{const e=H('input','cx-f');e.type='text';e.value=cfg[k];e.placeholder=ph||'';e.oninput=()=>{cfg[k]=e.value;save();sum()};e.onkeydown=ev=>ev.stopPropagation();row(t,d,e)};
  const mk=()=>{sets.innerHTML='';
