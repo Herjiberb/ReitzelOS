@@ -34,7 +34,7 @@ const IC=n=>/^(data|blob):/.test(n)?n:`assets/${n}-icon.svg`;
 /* ---------- theme / bg ---------- */
 const THEMES=[['Reitzel','#3700ff','#a600ff','#007bff'],['Ocean','#0047ff','#00b3ff','#00e0c0'],['Sunset','#ff3d00','#ff007a','#ffb300'],['Forest','#00a651','#00c9a7','#8bc34a'],['Rose','#ff2d75','#c800ff','#ff7a7a'],['Mono','#566480','#8a99b3','#b8c4d9']];
 function applyVars(){const r=document.documentElement.style,z={compact:[38,20],roomy:[48,28],luxurious:[66,44]}[S.size],T=THEMES[S.theme]||THEMES[0];r.setProperty('--a',T[1]);r.setProperty('--b',T[2]);r.setProperty('--c',T[3]);r.setProperty('--bg',bgv(prof().bg));r.setProperty('--tbh',z[0]+'px');r.setProperty('--ico',z[1]+'px');
- r.setProperty('--rad',{sharp:'4px',rounded:'12px',round:'22px'}[S.corners]||'12px');r.setProperty('--gl',.3+1.4*S.glass);document.body.classList.toggle('noanim',!!S.noanim)}
+ r.setProperty('--rad',{sharp:'4px',rounded:'12px',round:'22px'}[S.corners]||'12px');r.setProperty('--gl',.3+1.4*S.glass);document.body.classList.toggle('noanim',!!S.noanim);window.applyExtra&&applyExtra()}
 function applyTheme(){applyVars();tb.className=(S.conn?'conn ':'')+S.pos+(S.loose?' loose':'')+(S.nodate?' nodate':'')+(S.loose&&tb.classList.contains('show')?' show':'');renderTB();refit();desk(1);save()}
 function seg(p,v,o,fn){const s=H('div','seg',p);o.forEach(([k,l])=>{H('button',k===v?'on':'',s,l).onclick=()=>fn(k)});return s}
 function slider(p,v,fn){const sl=H('div','sl',p,'<div class=fill></div><div class=knob></div>');sl.style.setProperty('--v',v*100+'%');const set=x=>{x=cl(x,0,1);sl.style.setProperty('--v',x*100+'%');fn(x)},at=e=>{const r=sl.getBoundingClientRect();set((e.clientX-r.left)/r.width)};sl.onpointerdown=e=>{sl.setPointerCapture(e.pointerId);at(e);sl.onpointermove=at};sl.onpointerup=()=>{sl.onpointermove=null;save()};return sl}
@@ -43,7 +43,7 @@ const APPS={files:{name:'My Files',icon:'folder',w:720,h:460,ctx:()=>[['New fold
  settings:{name:'Settings',icon:'compass-settings',w:820,h:540,render:renderSettings}};
 let W=[],zc=10,nid=1;
 /* ---------- windows ---------- */
-function openApp(id,opt){if(!APPS[id]||(window.Apps&&!Apps.canOpen(id)))return;const a=APPS[id],A=area(),o=W.length%6*28;const el=H('div','win',$('#wins'));
+function openApp(id,opt){if(!APPS[id]||(window.Apps&&!Apps.canOpen(id)))return;window.noteRecent&&noteRecent(id);const a=APPS[id],A=area(),o=W.length%6*28;const el=H('div','win',$('#wins'));
  const w={id:nid++,app:id,el,min:false,max:false,prev:null,tab:opt&&opt.tab,sr:null};w.lockCursor=()=>{try{const q=$('.body',el).requestPointerLock();q&&q.catch&&q.catch(()=>{});tb.classList.remove('show');toast('Cursor locked — press Esc to release')}catch{}};W.push(w);
  const bw=Math.min(a.w,A.w-20),bh=Math.min(a.h,A.h-20);Object.assign(el.style,{width:bw+'px',height:bh+'px',left:A.x+Math.max(0,(A.w-bw)/2+o-60)+'px',top:A.y+Math.max(0,(A.h-bh)/2+o-40)+'px'});
  el.innerHTML=`<div class=tbar><img src="${IC(a.icon)}"><span>${a.name}</span><button class="wb m">${X.min}</button><button class="wb mx"><i class=ic>${X.max}</i><div class=snapm></div></button><button class="wb x">${X.x}</button></div><div class=body></div>`+['n','s','e','w','ne','nw','se','sw'].map(d=>`<div class="rz ${d}" data-d=${d}></div>`).join('');
@@ -77,9 +77,9 @@ function resize(w){w.el.querySelectorAll('.rz').forEach(r=>r.onpointerdown=e=>{e
 const tb=$('#tb');
 let runOrd=[];const reorderTB=ids=>{S.pins=[...ids.filter(x=>S.pins.includes(x)),...S.pins.filter(x=>!ids.includes(x))];runOrd=[...ids.filter(x=>!S.pins.includes(x)),...runOrd.filter(x=>!ids.includes(x))];save();renderTB()};
 function renderTB(){const V=S.pos!=='bottom',run=[];W.forEach(w=>{if(!w.temp&&!S.pins.includes(w.app)&&!run.includes(w.app))run.push(w.app)});run.sort((a,b)=>{const x=runOrd.indexOf(a),y=runOrd.indexOf(b);return(x<0?1e3:x)-(y<0?1e3:y)});tb.innerHTML='';
- const s=H('button','tbb',tb,`<img src="${IC('reitzel')}">`);s.onclick=e=>{e.stopPropagation();toggleStart()};
- const box=H('div','apps',tb),sz=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--ico'))+14,A=S.pins.concat(run).filter(k=>APPS[k]),room=V?innerHeight-260-sz*2:innerWidth-(S.conn?60:90)-330-sz*2,fit=Math.max(1,Math.floor(room/sz)),vis=A.length>fit?A.slice(0,fit-1):A,rest=A.slice(vis.length);
- const btn=(id,p)=>{const ws=W.filter(w=>w.app===id),b=H('button','tbb'+(ws.length?' run':'')+(ws.length>1?' multi':'')+(ws.some(w=>w.el.classList.contains('foc'))?' act':''),p,`<img src="${IC(APPS[id].icon)}">`);b.dataset.app=id;
+ const s=H('button','tbb',tb,`<img src="${IC('reitzel')}">`);s.onclick=e=>{e.stopPropagation();(window.toggleStartX||toggleStart0)()};
+ const box=H('div','apps',tb),sz=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--ico'))+14,A=S.pins.concat(run).filter(k=>APPS[k]),room=V?innerHeight-260-sz*2:innerWidth-(S.conn?60:90)-330-sz*2,fit=Math.max(1,Math.floor(room/(sz*(S.tbLabels&&!V?3:1)))),vis=A.length>fit?A.slice(0,fit-1):A,rest=A.slice(vis.length);
+ const btn=(id,p)=>{const ws=W.filter(w=>w.app===id),b=H('button','tbb'+(ws.length?' run':'')+(ws.length>1?' multi':'')+(ws.some(w=>w.el.classList.contains('foc'))?' act':''),p,`<img src="${IC(APPS[id].icon)}">`);b.dataset.app=id;if(S.tbLabels&&!V&&ws.length)H('span','tl',b).textContent=APPS[id].name;
   b.onpointerdown=e=>{if(e.button!==0)return;const sx=e.clientX,sy=e.clientY;let on=0;
    const mv=ev=>{const d=V?ev.clientY-sy:ev.clientX-sx;if(!on){if(Math.hypot(ev.clientX-sx,ev.clientY-sy)<6)return;on=1;b.classList.add('drg');closePop()}b.style.transform=V?`translateY(${d}px)`:`translateX(${d}px)`};
    const up=ev=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up);removeEventListener('pointercancel',up);if(!on)return;b._mv=1;setTimeout(()=>b._mv=0,50);const c=V?ev.clientY:ev.clientX,list=[...box.querySelectorAll('.tbb[data-app]')].filter(x=>x!==b);let i=list.findIndex(x=>{const r=x.getBoundingClientRect();return c<(V?r.top+r.height/2:r.left+r.width/2)});if(i<0)i=list.length;const ids=list.map(x=>x.dataset.app);ids.splice(i,0,id);reorderTB(ids)};
@@ -88,9 +88,9 @@ function renderTB(){const V=S.pos!=='bottom',run=[];W.forEach(w=>{if(!w.temp&&!S
   b.oncontextmenu=e=>{e.preventDefault();e.stopPropagation();const pn=S.pins.includes(id);ctx(e,[['Open',()=>openApp(id)],'sep',[pn?'Unpin from taskbar':'Pin to taskbar',()=>pn?unpin(id):pin(id)],...(ws.length?['sep',[ws.length>1?'Close all windows':'Close window',()=>ws.slice().forEach(closeW)]]:[])])};return b};
  vis.forEach((id,i)=>{if(i&&i===S.pins.length)H('i','dv',box);btn(id,box)});
  if(rest.length){const m=H('button','tbb more',box,'···');m.onclick=e=>{e.stopPropagation();miniBar(rest,m,btn)}}
- H('div','sp',tb);const wf=H('button','tbb',tb,`<img src="${IC('network')}">`);
- const c=H('div','clk',tb);const tick=()=>{const d=new Date(),tm=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:!S.mil});c.innerHTML='<div>'+(V?tm.replace(' ','<br>'):tm)+'</div>'+(V?'':'<div class=dt>'+d.toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'})+'</div>')};tick();c._t=tick}
-setInterval(()=>{const c=$('.clk');c&&c._t()},5000);
+ H('div','sp',tb);const wf=H('button','tbb tray',tb,`<img src="${IC('network')}">`);
+ const c=H('div','clk',tb);const tick=()=>{if(window.clockHTML){c.innerHTML=clockHTML(V);return}const d=new Date(),tm=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:!S.mil});c.innerHTML='<div>'+(V?tm.replace(' ','<br>'):tm)+'</div>'+(V?'':'<div class=dt>'+d.toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'})+'</div>')};tick();c._t=tick;window.tbExtras&&tbExtras(tb,s,box,V)}
+setInterval(()=>{const c=$('.clk');c&&c._t();window.panelTick&&panelTick()},1000);
 /* ---------- popups ---------- */
 const pop=$('#pop');
 function closePop(){pop.innerHTML=''}
@@ -102,7 +102,7 @@ function previews(ws,a){closePop();const p=H('div','pop prev',pop),PW=190;
 function miniBar(rest,a,btn){closePop();const p=H('div','pop prev',pop);const sc=H('div','apps',null);let off=0;const per=5;
  const draw=()=>{sc.innerHTML='';rest.slice(off,off+per).forEach(id=>btn(id,sc))};
  if(rest.length>per){const l=H('button','tbb',p,'‹'),r=H('button','tbb',null,'›');p.append(sc,r);l.onclick=()=>{off=Math.max(0,off-per);draw()};r.onclick=()=>{off=Math.min(rest.length-1,off+per);draw()}}else p.append(sc);draw();place(p,a)}
-function toggleStart(){if($('#start'))return closePop();closePop();const p=H('div','pop',pop);p.id='start';startPos(p);
+function toggleStart0(){if($('#start'))return closePop();closePop();const p=H('div','pop',pop);p.id='start';startPos(p);
  p.innerHTML=`<input class=srch placeholder="Search apps" autofocus><div class=grid></div><div class=foot></div>`;p.onclick=e=>{e.stopPropagation();if(!e.target.closest('.pm,.foot>button'))p.querySelector('.pm')?.remove()};
  const g=$('.grid',p),draw=q=>{g.innerHTML='';Object.keys(APPS).filter(k=>!APPS[k].hide&&APPS[k].name.toLowerCase().includes(q.toLowerCase())).forEach(k=>{const i=H('button','gi',g,`<img src="${IC(APPS[k].icon)}">${APPS[k].name}`);i.onclick=()=>{closePop();openApp(k)};i.oncontextmenu=e=>{e.preventDefault();e.stopPropagation();const pn=S.pins.includes(k);ctx(e,[['Open',()=>{closePop();openApp(k)}],'sep',['Add to desktop',()=>addDesk(k)],[pn?'Unpin from taskbar':'Pin to taskbar',()=>pn?unpin(k):pin(k)]])}})};draw('');
  $('.srch',p).oninput=e=>draw(e.target.value);setTimeout(()=>$('.srch',p).focus(),30);
@@ -161,14 +161,14 @@ function cropAvatar(host,done,cancel){osImage(f=>{const im=new Image();im.onload
   const[bc,bs]=B.querySelectorAll('button');bc.onclick=cancel;
   bs.onclick=()=>{const[w,h]=dim(),q=base*k,o=document.createElement('canvas');o.width=o.height=256;o.getContext('2d').drawImage(im,(150-R-(x-w))/q,(150-R-(y-h))/q,2*R/q,2*R/q,0,0,256,256);done(o.toDataURL('image/jpeg',.9))};zoom(1)}}
 function renderSettings(body,w){let tab=w.tab||'Personalization';w.setTab=t=>{tab=t;draw()};let lt;const draw=()=>{const op=$('.pane',body),top=op&&lt===tab?op.scrollTop:0;lt=tab;draw0();const np=$('.pane',body);if(np)np.scrollTop=top},draw0=()=>{body.innerHTML=`<div class=app><div class=nav></div><div class=pane></div></div>`;const nv=$('.nav',body),pn=$('.pane',body);
- ['Personalization','Profiles','Taskbar','Time','Defaults','System'].forEach(t=>{const b=H('button',t===tab?'on':'',nv,t);b.onclick=()=>{tab=t;draw()}});H('h3','',pn).textContent=tab;const card=(h)=>{const c=H('div','card',pn,h||'');return c},row=(c,l)=>{const r=H('div','rw',c);H('span','',r).textContent=l;return r};
+ ['Personalization','Desktop','Taskbar','Start menu','Time','Profiles','Defaults','System'].forEach(t=>{const b=H('button',t===tab?'on':'',nv,t);b.onclick=()=>{tab=t;draw()}});H('h3','',pn).textContent=tab;const card=(h)=>{const c=H('div','card',pn,h||'');return c},row=(c,l)=>{const r=H('div','rw',c);H('span','',r).textContent=l;return r};
  const ref=()=>{save();applyTheme();desk();draw()};
  if(tab==='Personalization'){const p=prof();[['Wallpaper','bg'],['Lock screen','lockbg']].forEach(([l,k])=>{const c=card(),r=row(c,l+' — '+p.name);if(p[k]){const im=H('div','',c);im.style.cssText=`height:90px;border-radius:8px;background:url(${p[k]}) center/cover`}const r2=H('div','rw',r);H('button','btn pri',r2,'Choose from My Files').onclick=()=>pickImg(d=>{p[k]=d;ref()},2560);H('button','btn',r2,'Default').onclick=()=>{p[k]=null;ref()};H('small','',c,'Import the image into My Files first (for example into Pictures), then choose it here.').style.opacity='.6'});
  const c1=card('<b>Accent theme</b>'),sw=H('div','sw',c1);THEMES.forEach((T,i)=>{const b=H('button',(S.theme||0)===i?'on':'',sw,`<i style="background:linear-gradient(90deg,${T[1]},${T[2]},${T[3]})"></i>${T[0]}`);b.onclick=()=>{S.theme=i;ref()}});
  const r3=row(card(),'Window corners');seg(r3,S.corners,[['sharp','Sharp'],['rounded','Rounded'],['round','Very round']],v=>{S.corners=v;ref()});
  seg(row(card(),'Glass opacity (taskbar & menus)'),S.glass,[[0,'Clear'],[.25,'Light'],[.5,'Default'],[.75,'Rich'],[1,'Solid']],v=>{S.glass=v;ref()});
  const tg=(l,get,set)=>{const r=row(card(),l),i=H('input','',r);i.type='checkbox';i.checked=get();i.onchange=()=>{set(i.checked);ref()}};
- tg('Show date on taskbar',()=>!S.nodate,v=>S.nodate=!v);tg('Reduce animations',()=>!!S.noanim,v=>S.noanim=v)}
+ tg('Reduce animations',()=>!!S.noanim,v=>S.noanim=v);window.settingsExtra&&settingsExtra('Personalization',{pn,card,row,ref,draw,H,seg,body})}
  if(tab==='Profiles'){const me=prof(),adm=!!me.admin;S.profiles.filter(p=>adm||p===me).forEach(p=>{const c=card(),r=row(c,'');r.firstChild.remove();const a=av(p);a.style.cssText='width:48px;height:48px;flex:none';r.append(a);
    const n=H('input','in',r);n.value=p.name;n.onchange=()=>{const v=n.value.trim()||'User';if(nameTaken(v,p)){toast('That name is already used by another profile');n.value=p.name;return}p.name=v;FS.renameHome(p).then(()=>ref())};
    const pw=H('input','in',r);pw.placeholder=p.hash?'Password set (change)':'Set password (optional)';pw.type='password';pw.onchange=async()=>{await setPw(p,pw.value);ref()};
@@ -176,17 +176,14 @@ function renderSettings(body,w){let tab=w.tab||'Personalization';w.setTab=t=>{ta
    if(p.hash)H('button','btn',r2,'Remove password').onclick=()=>{p.salt=p.hash='';ref()};
    if(adm){const r3=row(c,p.root?'Root administrator (locked)':'Administrator'),i=H('input','',r3);i.type='checkbox';i.checked=!!p.admin;i.disabled=!!p.root;i.onchange=()=>{if(p.root||(!i.checked&&S.profiles.filter(x=>x.admin).length<2)){toast('At least one administrator is required');i.checked=true;return}p.admin=i.checked;ref()};if(!p.root)H('button','btn dng',r2,'Delete').onclick=()=>delProfile(p,ref)}});
   if(adm)H('button','btn pri',pn,'+ Add profile').onclick=async()=>{await addProfile(uniqueName('User'),false);ref()};else H('small','',pn,'Only administrators can add, remove or promote profiles. Your files live in your own home folder.').style.opacity=.6}
- if(tab==='Taskbar'){const c=card(),sel=(r,v,o,fn)=>seg(r,v,o,fn),chk=(l,k)=>{const r=row(c,l),i=H('input','',r);i.type='checkbox';i.checked=S[k];i.onchange=()=>{S[k]=i.checked;ref()}};
-  sel(row(c,'Position'),S.pos,[['bottom','Bottom'],['left','Left'],['right','Right']],v=>{S.pos=v;ref()});sel(row(c,'Size'),S.size,[['compact','Compact'],['roomy','Roomy'],['luxurious','Luxurious']],v=>{S.size=v;ref()});
-  chk('Connected taskbar (flush with the screen edge)','conn');chk('Loose taskbar (hidden until you move to its edge; overlays apps)','loose')}
- if(tab==='Time'){const c=card(),r=row(c,'24-hour (military) clock');const k=H('input','',r);k.type='checkbox';k.checked=S.mil;k.onchange=()=>{S.mil=k.checked;ref()}}
+ if(window.settingsExtra&&['Desktop','Taskbar','Start menu','Time'].includes(tab))settingsExtra(tab,{pn,card,row,ref,draw,H,seg,body});
  if(tab==='Defaults'){const fms=Object.entries(APPS).filter(([k,a])=>a.fm&&!a.hide).map(([k,a])=>[k,a.name]),r1=row(card(),'File manager -- opens folders and handles every open/save prompt');seg(r1,APPS[S.defFm]&&APPS[S.defFm].fm?S.defFm:'files',fms,v=>{S.defFm=v;save();draw()});
   if(fms.length<2)H('small','',r1.parentNode,'Install another file manager from the App Store (for example File Scout) to choose it here.').style.opacity='.6';
   const r2=row(card(),'Compost bin -- deleted files are emptied');seg(r2,S.compost||'never',[['now','Immediately'],['7','After 7 days'],['30','After 30 days'],['365','After 365 days'],['never','Never']],v=>{S.compost=v;save();typeof FS!=='undefined'&&FS.sweep&&FS.sweep().catch(()=>{});draw()});H('small','',r2.parentNode,'Immediately skips the bin and deletes files for good. Never keeps them until you empty it.').style.opacity='.6'}
- if(tab==='System'){const c0=card(),r0=row(c0,'Immersive mode (fullscreen + capture browser shortcuts)'),k0=H('input','',r0);k0.type='checkbox';k0.checked=S.immersive;k0.onchange=()=>{S.immersive=k0.checked;save();if(k0.checked)immerse();else{document.fullscreenElement&&document.exitFullscreen();kunlock()}};if(prof().root){const c=card(),r=row(c,'Factory reset — erases all profiles, passwords and settings');H('button','btn dng',r,'Reset').onclick=()=>{factory()}}}};draw()}
+ if(tab==='System'){window.settingsExtra&&settingsExtra('System',{pn,card,row,ref,draw,H,seg,body});const c0=card(),r0=row(c0,'Immersive mode (fullscreen + capture browser shortcuts)'),k0=H('input','',r0);k0.type='checkbox';k0.checked=S.immersive;k0.onchange=()=>{S.immersive=k0.checked;save();if(k0.checked)immerse();else{document.fullscreenElement&&document.exitFullscreen();kunlock()}};if(prof().root){const c=card(),r=row(c,'Factory reset — erases all profiles, passwords and settings');H('button','btn dng',r,'Reset').onclick=()=>{factory()}}}};draw()}
 /* ---------- layout, desktop, context menus ---------- */
-const TBH=()=>({compact:38,roomy:48,luxurious:66})[S.size],thick=()=>TBH()+(S.conn?0:16),CW=84,CH=92,PAD=14;
-function area(){const T=thick();let x=0,y=0,w=innerWidth,h=innerHeight;if(!S.loose){if(S.pos==='bottom')h-=T;else{w-=T;if(S.pos==='left')x=T}}return{x,y,w,h}}
+const TBH=()=>({compact:38,roomy:48,luxurious:66})[S.size],thick=()=>TBH()+(S.conn?0:16),PAD=14;let CW=84,CH=92;const PANELH=()=>S.panel?28:0;
+function area(){const T=thick();let x=0,y=PANELH(),w=innerWidth,h=innerHeight-PANELH();if(!S.loose){if(S.pos==='bottom')h-=T;else{w-=T;if(S.pos==='left')x=T}}return{x,y,w,h}}
 function refit(m){const A=area();W.forEach(w=>{const e=w.el;if(w.max)Object.assign(e.style,{left:A.x+'px',top:A.y+'px',width:A.w+'px',height:A.h+'px'});else if(w.sr&&!m){const r=w.sr;Object.assign(e.style,{left:A.x+A.w*r[0]/100+'px',top:A.y+A.h*r[1]/100+'px',width:A.w*r[2]/100+'px',height:A.h*r[3]/100+'px'})}})}
 function startPos(p){const T=thick();if(S.pos==='bottom')p.style.bottom=T+(S.conn?18:10)+'px';else{p.style.bottom='12px';p.style.marginLeft='0';p.style.left=S.pos==='left'?T+8+'px':'auto';if(S.pos==='right')p.style.right=T+8+'px'}}
 const pin=k=>{if(!S.pins.includes(k))S.pins.push(k);save();renderTB()},unpin=k=>{S.pins=S.pins.filter(x=>x!==k);save();renderTB()};
@@ -197,7 +194,7 @@ function freeCell(G,tk,c0,r0){let best=null,bd=1e9;for(let c=0;c<G.c;c++)for(let
 const selIds=new Set();let deskEls=[];
 const paintSel=()=>deskEls.forEach(i=>i.el.classList.toggle('sel',selIds.has(i.key)));
 function desk(fit){window.deskPre&&window.deskPre();const d=$('#desk'),G=grid(),tk=new Set();d.innerHTML='';deskEls=[];S.desk.forEach(s=>s.dc=null);
- S.desk.forEach(s=>{let c=s.c,r=s.r;if((fit&&(c>=G.c||r>=G.r))||tk.has(c+','+r)){const f=freeCell(G,tk,Math.min(c,G.c-1),Math.min(r,G.r-1));if(!f)return;[c,r]=f;if(fit){s.c=c;s.r=r}}tk.add(c+','+r);s.dc=c;s.dr=r;
+ S.desk.forEach(s=>{let c=s.c,r=s.r;if((fit&&(c>=G.c||r>=G.r))||tk.has(c+','+r)){const f=freeCell(G,tk,Math.min(c,G.c-1),Math.min(r,G.r-1));if(!f)return;[c,r]=f;}tk.add(c+','+r);s.dc=c;s.dr=r;
   const a=s.fsc?{icon:s.icon,name:s.name}:APPS[s.app];if(!a)return;const nm=s.name||a.name,el=H('div','sc'+(s.fsc&&s.kind!=='app'?' fsc':'')+(selIds.has(s.id)?' sel':''),d,`<img src="${IC(a.icon)}"><span></span>`);$('span',el).textContent=nm;deskEls.push({key:s.id,el});el.style.left=G.x+PAD+c*CW+'px';el.style.top=G.y+PAD+r*CH+'px';
   let st=null,mv=0,lt=0,gr=[];el.ondblclick=()=>openS(s);
   el.onpointerdown=e=>{if(e.button)return;st=[e.clientX,e.clientY];mv=0;el.setPointerCapture(e.pointerId)};
