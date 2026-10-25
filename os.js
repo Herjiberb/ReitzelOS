@@ -11,7 +11,7 @@ const factory=async()=>{if(!await sysConfirm({title:'Factory reset?',msg:'This e
 const PK=['theme','corners','glass','nodate','noanim','pos','size','conn','loose','mil','pins','fm','scout','installed','defFm','compost'],DP={defFm:'files',compost:'never',theme:0,corners:'rounded',glass:.5,nodate:false,noanim:false,pos:'bottom',size:'compact',conn:false,loose:false,mil:false,pins:['files','editor','store','terminal','settings']};let PL=null;
 const cfgT={},UCK=['avatar','letters','bg','lockbg','prefs'];
 function saveCfg(){if(typeof FS==='undefined'||!FS.writeCfg)return;S.profiles.forEach(p=>{clearTimeout(cfgT[p.id]);cfgT[p.id]=setTimeout(()=>FS.writeCfg(p),300)})}
-const stripP=p=>{const o={...p};if(typeof FS!=='undefined'&&FS.cfgSynced&&FS.cfgSynced(p))UCK.forEach(k=>delete o[k]);return o};
+const stripP=p=>{const o={...p};if(typeof FS!=='undefined'&&FS.cfgSynced&&FS.cfgSynced(p))['avatar','bg','lockbg'].forEach(k=>delete o[k]);return o};
 const save=()=>{try{const lp=S.profiles.find(p=>p.id===PL);if(lp)lp.prefs=Object.fromEntries(PK.map(k=>[k,S[k]]));const o={...S};PK.forEach(k=>delete o[k]);delete o.desk;o.profiles=S.profiles.map(stripP);
  if(typeof FS!=='undefined'&&FS.dirId&&S.fsv){try{DB.transaction('kv','readwrite').objectStore('kv').put(o,'state')}catch(e){console.error(e)}}else{const ds=S.desk;try{DB.transaction('kv','readwrite').objectStore('kv').put({...S,desk:ds&&ds.filter(x=>!x.fsc)},'state')}catch(e){console.error(e)}}
  saveCfg();window.deskHook&&window.deskHook()}catch(e){console.error(e)}};
