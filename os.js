@@ -27,7 +27,7 @@ const uniqueName=b=>{let n=2,v=b;while(nameTaken(v,null))v=b+' '+n++;return v};
 const prof=id=>S.profiles.find(p=>p.id===(id??S.cur))||S.profiles[0];
 const av=(p,c)=>{const e=H('div','av '+(c||''));if(p.avatar&&!p.letters){e.innerHTML=`<img class=av src="${p.avatar}">`}else e.textContent=(p.name||'?')[0].toUpperCase();return e};
 const X={min:'<svg viewBox="0 0 12 12"><path d="M2 6h8"/></svg>',max:'<svg viewBox="0 0 12 12"><rect x="2" y="2" width="8" height="8" rx="2"/></svg>',res:'<svg viewBox="0 0 12 12"><rect x="2" y="3.5" width="6.5" height="6.5" rx="1.5"/><path d="M4 3.5V2.5a1 1 0 011-1h4.500a1 1 0 011 1V7a1 1 0 01-1 1H8.500"/></svg>',x:'<svg viewBox="0 0 12 12"><path d="M2.500 2.500l7 7M9.500 2.500l-7 7"/></svg>'};
-const IC=n=>`assets/${n}-icon.svg`;
+const IC=n=>/^(data|blob):/.test(n)?n:`assets/${n}-icon.svg`;
 /* ---------- theme / bg ---------- */
 const THEMES=[['Reitzel','#3700ff','#a600ff','#007bff'],['Ocean','#0047ff','#00b3ff','#00e0c0'],['Sunset','#ff3d00','#ff007a','#ffb300'],['Forest','#00a651','#00c9a7','#8bc34a'],['Rose','#ff2d75','#c800ff','#ff7a7a'],['Mono','#566480','#8a99b3','#b8c4d9']];
 function applyVars(){const r=document.documentElement.style,z={compact:[38,20],roomy:[48,28],luxurious:[66,44]}[S.size],T=THEMES[S.theme]||THEMES[0];r.setProperty('--a',T[1]);r.setProperty('--b',T[2]);r.setProperty('--c',T[3]);r.setProperty('--bg',bgv(prof().bg));r.setProperty('--tbh',z[0]+'px');r.setProperty('--ico',z[1]+'px');
