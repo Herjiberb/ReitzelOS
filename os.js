@@ -40,7 +40,7 @@ const APPS={files:{name:'My Files',icon:'folder',w:720,h:460,ctx:()=>[['New fold
  settings:{name:'Settings',icon:'compass-settings',w:820,h:540,render:renderSettings}};
 let W=[],zc=10,nid=1;
 /* ---------- windows ---------- */
-function openApp(id,opt){if(!APPS[id])return;const a=APPS[id],A=area(),o=W.length%6*28;const el=H('div','win',$('#wins'));
+function openApp(id,opt){if(!APPS[id]||(window.Apps&&!Apps.canOpen(id)))return;const a=APPS[id],A=area(),o=W.length%6*28;const el=H('div','win',$('#wins'));
  const w={id:nid++,app:id,el,min:false,max:false,prev:null,tab:opt&&opt.tab,sr:null};w.lockCursor=()=>{try{const q=$('.body',el).requestPointerLock();q&&q.catch&&q.catch(()=>{});tb.classList.remove('show');toast('Cursor locked — press Esc to release')}catch{}};W.push(w);
  const bw=Math.min(a.w,A.w-20),bh=Math.min(a.h,A.h-20);Object.assign(el.style,{width:bw+'px',height:bh+'px',left:A.x+Math.max(0,(A.w-bw)/2+o-60)+'px',top:A.y+Math.max(0,(A.h-bh)/2+o-40)+'px'});
  el.innerHTML=`<div class=tbar><img src="${IC(a.icon)}"><span>${a.name}</span><button class="wb m">${X.min}</button><button class="wb mx"><i class=ic>${X.max}</i><div class=snapm></div></button><button class="wb x">${X.x}</button></div><div class=body></div>`+['n','s','e','w','ne','nw','se','sw'].map(d=>`<div class="rz ${d}" data-d=${d}></div>`).join('');
