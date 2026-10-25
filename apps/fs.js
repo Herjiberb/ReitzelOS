@@ -36,11 +36,23 @@ const FS=(()=>{
   async blob(id){const t=db.transaction('d'),q=t.objectStore('d').get(id);await done(t);return q.result||new Blob([])},
   search(root,q,hidden,limit=20000){q=q.toLowerCase();const out=[],st=[root];while(st.length&&out.length<limit){const d=st.pop();const k=K.get(d);if(!k)continue;for(const[ln,id]of k){if(!hidden&&ln[0]==='.')continue;if(!canR(M.get(id)))continue;if(ln.includes(q))out.push(M.get(id));const m=M.get(id);if(m.t==='d')st.push(id)}}return out},
   count(id){let n=0,sz=0;const st=[id];while(st.length){const k=K.get(st.pop());if(k)for(const c of k.values()){const m=M.get(c);if(!canR(m))continue;n++;sz+=m.s||0;if(m.t==='d')st.push(c)}}return[n,sz]},
-  async syncSys(){try{let sys=M.get(K.get('root').get('.system'));let as=K.get(sys.id).get('assets');as=as?M.get(as):await R.mkdir(sys.id,'assets',1);
-   const files=['index.html','style.css','os.js','apps.js','apps2.js','sw.js'],assets=['reitzel','folder','folder-single','compass-settings','network','editor','file-image','file-generic','file-scout','tote-store','terminal','cloud-export'].map(x=>x+'-icon.svg');
-   for(const[par,list,pf]of[[sys,files,''],[as,assets,'assets/']])for(const f of list){try{const r=await fetch(pf+f);if(!r.ok)continue;const b=await r.blob(),old=K.get(par.id).get(f);
-    if(old&&M.get(old).s===b.size)continue;if(old)await R.write(null,f,b,old);else await R.write(par.id,f,b,null,1)}catch{}}
-   }catch(e){console.error('sys sync',e)}}
+  async syncSys(){const rep={add:0,upd:0,del:0,ok:false};try{
+   const sys=M.get(K.get('root').get('.system')),get=async u=>{try{const r=await fetch(u,{cache:'no-store'});return r.ok?r:null}catch{return null}};
+   const ir=await get('index.html');if(!ir)return rep;
+   /* the current file list is discovered from what the OS really loads: index.html, the service worker's file list, plus the known assets */
+   const want=new Set(['index.html','sw.js','style.css','os.js']),add=t=>{for(const m of t.matchAll(/(?:src=|href=|')\.?\/?((?:apps|assets|emojis)\/[\w.\-\/]+\.(?:js|css|svg|html)|[\w\-]+\.(?:js|css|html))\b/g))want.add(m[1])};
+   add(await ir.clone().text());const sr=await get('sw.js');if(sr)add(await sr.text());
+   ['reitzel','folder','folder-single','compass-settings','network','editor','file-image','file-generic','file-scout','tote-store','terminal','cloud-export','browser'].forEach(x=>want.add('assets/'+x+'-icon.svg'));
+   const keep=new Set([sys.id]),dirOf=async parts=>{let p=sys.id;for(const s of parts){let c=K.get(p).get(s.toLowerCase());if(!c){c=(await R.mkdir(p,s,1)).id}keep.add(c);p=c}return p};
+   for(const path of want){const parts=path.split('/'),name=parts.pop(),r=await get(path);if(!r)continue;
+    const b=await r.blob(),par=await dirOf(parts),old=K.get(par).get(name.toLowerCase());
+    if(old){keep.add(old);const m=M.get(old);let same=m.s===b.size;if(same){const a=new Uint8Array(await R.blob(old).then(x=>x.arrayBuffer())),c=new Uint8Array(await b.arrayBuffer());for(let i=0;i<a.length;i++)if(a[i]!==c[i]){same=false;break}}
+     if(!same){await R.write(null,name,b,old);rep.upd++}}
+    else{keep.add((await R.write(par,name,b,null,1)).id);rep.add++}}
+   /* anything in .system that is no longer part of the OS is outdated: remove it */
+   const stale=[],walk=id=>{for(const c of K.get(id).values()){if(!keep.has(c))stale.push(c);else if(M.get(c).t==='d')walk(c)}};walk(sys.id);
+   if(stale.length){await R.del(stale);rep.del=stale.length}rep.ok=true;
+  }catch(e){console.error('sys sync',e)}return rep}
  };
  /* ===== universal access-control middleman: every app (Files, Editor, Terminal, dialogs, shortcuts) goes through these checks ===== */
  const R={};['get','kids','resolve','mkdir','write','writeMany','rename','move','copy','del','blob','search'].forEach(k=>R[k]=F[k]);F.raw=R;
