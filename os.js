@@ -11,7 +11,7 @@ const factory=async()=>{if(!await sysConfirm({title:'Factory reset?',msg:'This e
 const PK=['theme','corners','glass','nodate','noanim','pos','size','conn','loose','mil','pins','fm','scout','installed','defFm','compost'],DP={defFm:'files',compost:'never',theme:0,corners:'rounded',glass:.5,nodate:false,noanim:false,pos:'bottom',size:'compact',conn:false,loose:false,mil:false,pins:['files','editor','store','terminal','settings']};let PL=null;
 const cfgT={},UCK=['avatar','letters','bg','lockbg','prefs'];
 function saveCfg(){if(typeof FS==='undefined'||!FS.writeCfg)return;S.profiles.forEach(p=>{clearTimeout(cfgT[p.id]);cfgT[p.id]=setTimeout(()=>FS.writeCfg(p),300)})}
-const stripP=p=>{const o={...p};UCK.forEach(k=>delete o[k]);return o};
+const stripP=p=>{const o={...p};if(typeof FS!=='undefined'&&FS.cfgSynced&&FS.cfgSynced(p))UCK.forEach(k=>delete o[k]);return o};
 const save=()=>{try{const lp=S.profiles.find(p=>p.id===PL);if(lp)lp.prefs=Object.fromEntries(PK.map(k=>[k,S[k]]));const o={...S};PK.forEach(k=>delete o[k]);delete o.desk;o.profiles=S.profiles.map(stripP);
  if(typeof FS!=='undefined'&&FS.dirId&&S.fsv){try{DB.transaction('kv','readwrite').objectStore('kv').put(o,'state')}catch(e){console.error(e)}}else{const ds=S.desk;try{DB.transaction('kv','readwrite').objectStore('kv').put({...S,desk:ds&&ds.filter(x=>!x.fsc)},'state')}catch(e){console.error(e)}}
  saveCfg();window.deskHook&&window.deskHook()}catch(e){console.error(e)}};
@@ -255,10 +255,11 @@ if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch((
  if(!S.mig){const lg=Object.fromEntries(PK.map(k=>[k,S[k]!==undefined?S[k]:DP[k]]));S.profiles.forEach(p=>{if(!p.prefs)p.prefs={...lg}});S.mig=1}
  /* legacy per-user data that used to be global */
  if(!S.fsv&&S.profiles.length){const p0=S.profiles[0];p0.prefs=p0.prefs||{};['pins','fm','scout','installed'].forEach(k=>{if(S[k]!==undefined&&p0.prefs[k]===undefined)p0.prefs[k]=S[k]})}
- try{FS.setWho(()=>S.profiles.find(p=>p.id===S.cur)||S.profiles[0]||null);await FS.ready;await FS.boot(S)}catch(e){console.error('boot',e)}
+ try{FS.onCfg=()=>save();FS.setWho(()=>S.profiles.find(p=>p.id===S.cur)||S.profiles[0]||null);await FS.ready;await FS.boot(S)}catch(e){console.error('boot',e);setTimeout(()=>typeof RZ!=='undefined'&&RZ.toast&&RZ.toast('Storage warning: '+(e.message||e)),2000)}
  S.pos??='bottom';S.loose??=false;S.immersive??=true;S.theme??=0;S.corners??='rounded';S.glass??=.5;
  if(S.profiles.length&&!S.profiles.some(p=>p.admin))S.profiles[0].admin=true;
  if(S.profiles.length&&!S.profiles.some(p=>p.id===S.cur))S.cur=S.profiles[0].id;
  if(S.profiles.length)loadPrefs(S.cur);(window.regInstalled&&window.regInstalled());(typeof SC!=='undefined'&&SC.reload());
+ const fl=()=>{try{save();typeof FS!=='undefined'&&FS.flushCfg&&FS.flushCfg()}catch{}};addEventListener('pagehide',fl);addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')fl()});
  addEventListener('resize',()=>{closePop();renderTB();refit(1)});addEventListener('keydown',e=>{if(!L.classList.contains('hide')&&e.ctrlKey&&e.altKey&&e.shiftKey&&e.code==='KeyX'){e.preventDefault();factory()}});
  if(S.profiles.length){save();applyTheme();desk();lockNow()}else{desk();setupProfile()}})();
