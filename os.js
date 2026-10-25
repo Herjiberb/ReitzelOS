@@ -3,7 +3,9 @@ const $=(s,e=document)=>e.querySelector(s),H=(t,c,p,x)=>{const e=document.create
 const DEF=()=>({profiles:[{id:1,name:'User',avatar:null,letters:true,salt:'',hash:'',bg:null,lockbg:null}],cur:1,mil:false,conn:false,size:'compact'});
 let S=DEF(),DB;
 const idb=()=>new Promise((res,rej)=>{const r=indexedDB.open('reitzel-os',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
-const load=()=>new Promise(res=>{const q=DB.transaction('kv').objectStore('kv').get('state');q.onsuccess=()=>res(q.result);q.onerror=()=>res()});
+const load=()=>new Promise(res=>{try{const q=DB.transaction('kv').objectStore('kv').get('state');q.onsuccess=()=>res(q.result);q.onerror=()=>res(undefined)}catch{res(undefined)}});
+/* small, synchronous marker: set once we know this browser has real saved state, so a later failed/empty IndexedDB read can never be mistaken for a fresh install */
+const SEEN='rz-seen';const markSeen=()=>{try{localStorage.setItem(SEEN,'1')}catch{}};const hasSeen=()=>{try{return localStorage.getItem(SEEN)==='1'}catch{return false}};
 const bgv=d=>d?`url(${d})`:'linear-gradient(135deg,color-mix(in srgb,var(--a) 20%,#000),color-mix(in srgb,var(--b) 20%,#000) 50%,color-mix(in srgb,var(--c) 20%,#000))';
 const hash=async(pw,salt)=>{const d=new TextEncoder().encode(salt+'|'+pw);if(crypto.subtle){const b=await crypto.subtle.digest('SHA-256',d);return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}let h=5381;for(const c of d)h=(h*33^c)>>>0;return'f'+h};
 const setPw=async(p,v)=>{if(!v){p.salt=p.hash='';return}p.salt=[...crypto.getRandomValues(new Uint32Array(3))].join('-');p.hash=await hash(v,p.salt)};
@@ -12,8 +14,9 @@ const PK=['theme','corners','glass','nodate','noanim','pos','size','conn','loose
 const cfgT={},UCK=['avatar','letters','bg','lockbg','prefs'];
 function saveCfg(){if(typeof FS==='undefined'||!FS.writeCfg)return;S.profiles.forEach(p=>{clearTimeout(cfgT[p.id]);cfgT[p.id]=setTimeout(()=>FS.writeCfg(p),300)})}
 const stripP=p=>{const o={...p};if(typeof FS!=='undefined'&&FS.cfgSynced&&FS.cfgSynced(p))['avatar','bg','lockbg'].forEach(k=>delete o[k]);return o};
+const putState=(o,retry)=>{try{const t=DB.transaction('kv','readwrite');t.objectStore('kv').put(o,'state');t.oncomplete=()=>markSeen();t.onerror=t.onabort=()=>{if(retry)setTimeout(()=>putState(o,false),300);else console.error('save failed to commit',t.error)}}catch(e){console.error(e);if(retry)setTimeout(()=>putState(o,false),300)}};
 const save=()=>{try{const lp=S.profiles.find(p=>p.id===PL);if(lp)lp.prefs=Object.fromEntries(PK.map(k=>[k,S[k]]));const o={...S};PK.forEach(k=>delete o[k]);delete o.desk;o.profiles=S.profiles.map(stripP);
- if(typeof FS!=='undefined'&&FS.dirId&&S.fsv){try{DB.transaction('kv','readwrite').objectStore('kv').put(o,'state')}catch(e){console.error(e)}}else{const ds=S.desk;try{DB.transaction('kv','readwrite').objectStore('kv').put({...S,desk:ds&&ds.filter(x=>!x.fsc)},'state')}catch(e){console.error(e)}}
+ if(typeof FS!=='undefined'&&FS.dirId&&S.fsv)putState(o,true);else{const ds=S.desk;putState({...S,desk:ds&&ds.filter(x=>!x.fsc)},true)}
  saveCfg();window.deskHook&&window.deskHook()}catch(e){console.error(e)}};
 function loadPrefs(id){const p=S.profiles.find(x=>x.id===id),q=(p&&p.prefs)||{};PK.forEach(k=>{const v=q[k]!==undefined?q[k]:DP[k];S[k]=v&&typeof v==='object'?JSON.parse(JSON.stringify(v)):v});S.glass=[0,.25,.5,.75,1].reduce((a,b)=>Math.abs(b-S.glass)<Math.abs(a-S.glass)?b:a);PL=id}
 function switchTo(id){save();if(id!==S.cur){W.forEach(w=>{try{w.onclose&&w.onclose()}catch{}w.el.remove()});W=[];closePop()}S.cur=id;loadPrefs(id);S.desk=[];(window.regInstalled&&window.regInstalled());(typeof SC!=='undefined'&&SC.reload());applyVars();renderTB();desk();save()}
@@ -262,8 +265,15 @@ addEventListener('mousedown',e=>{if(e.button===1)e.preventDefault()});
 /* ---------- boot ---------- */
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch{}
-(async()=>{try{DB=await idb();let s=await load();if(!s){await new Promise(r=>setTimeout(r,250));s=await load()}if(!s)try{s=JSON.parse(localStorage.getItem('rzos'))}catch{}
- if(s){S=s;if(S.bg){S.profiles[0].bg=S.bg;delete S.bg}for(const p of S.profiles)if(p.pw){await setPw(p,p.pw);delete p.pw}localStorage.removeItem('rzos')}}catch(e){console.error(e)}
+(async()=>{let s;try{DB=await idb();for(const wait of[0,150,350,700,1200,2000]){if(wait)await new Promise(r=>setTimeout(r,wait));s=await load();if(s)break}
+  if(!s&&hasSeen()){
+   /* this browser has real saved data, but IndexedDB didn't return it in time (almost always a reload racing an unfinished write from the previous page).
+      Showing nothing and falling through to defaults would then get SAVED OVER the real data — so instead, wait longer and keep trying rather than ever booting into (and persisting) a blank profile. */
+   for(let i=0;i<20&&!s;i++){await new Promise(r=>setTimeout(r,500));s=await load()}
+   if(!s){document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;inset:0;z-index:99999;background:#0b0824;color:#eef;display:grid;place-items:center;font:15px system-ui;text-align:center;padding:24px"><div><p>Your saved data is taking longer than usual to load.</p><p style="opacity:.7">Reloading now could overwrite it, so this is waiting rather than guessing.</p><button onclick="location.reload()" style="margin-top:14px;padding:8px 18px;border:0;border-radius:8px;background:#3700ff;color:#fff;cursor:pointer">Try again</button></div></div>');
+    return}}
+  if(!s)try{s=JSON.parse(localStorage.getItem('rzos'))}catch{}
+  if(s){S=s;markSeen();if(S.bg){S.profiles[0].bg=S.bg;delete S.bg}for(const p of S.profiles)if(p.pw){await setPw(p,p.pw);delete p.pw}localStorage.removeItem('rzos')}}catch(e){console.error(e)}
  S.profiles??=[];S.desk??=[];
  if(!S.mig){const lg=Object.fromEntries(PK.map(k=>[k,S[k]!==undefined?S[k]:DP[k]]));S.profiles.forEach(p=>{if(!p.prefs)p.prefs={...lg}});S.mig=1}
  /* legacy per-user data that used to be global */
