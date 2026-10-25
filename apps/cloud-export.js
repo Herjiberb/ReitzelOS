@@ -2,33 +2,39 @@
 /* apps/cloud-export.js — Cloud Export (installable): zip your files and send them out */
 (()=>{
 Apps.style('cloud-export',`
-/* ---------- Cloud Export ---------- */
-.cx{height:100%;overflow:auto;background:#fafaf9;color:#171717;font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:block}
+.cx{height:100%;display:flex;flex-direction:column;background:#0c0e13;color:#e8eaf0;font:13.5px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color-scheme:dark}
 .cx *{box-sizing:border-box}
-.cx-in{max-width:760px;margin:0 auto;padding:30px 28px 44px}
-.cx-hd{display:flex;gap:14px;align-items:center}.cx-hd img{width:44px;height:44px}
-.cx h1{font-size:25px;font-weight:650;letter-spacing:-.02em;margin:0;color:#171717}
-.cx-sub{color:#737373;margin:2px 0 0}
-.cx-card{background:#fff;border:1px solid #e7e5e4;border-radius:14px;padding:18px 20px;margin-top:16px}
-.cx-card h2{font-size:13px;font-weight:650;margin:0 0 4px;color:#171717;letter-spacing:.01em}
-.cx-card>p{margin:0 0 12px;color:#737373;font-size:13px}
-.cx-tools{display:flex;gap:8px;align-items:center;margin-bottom:8px}.cx-tools span{margin-left:auto;color:#737373;font-size:12.5px}
-.cx .cx-btn{border:1px solid #d6d3d1;background:#fff;color:#171717;border-radius:9px;padding:6px 13px;font:inherit;font-size:13px;cursor:pointer;transition:.12s}
-.cx .cx-btn:hover{background:#f5f5f4}.cx .cx-btn.pri{background:#171717;border-color:#171717;color:#fff}.cx .cx-btn.pri:hover{background:#363636}.cx .cx-btn:disabled{opacity:.45;pointer-events:none}
-.cx-tree{border:1px solid #efeeec;border-radius:10px;max-height:260px;overflow:auto;padding:4px;background:#fcfcfb}
-.cx-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:7px;min-height:28px}.cx-row:hover{background:#f3f2f0}
-.cx-row .tg{width:18px;height:18px;border:0;background:none;color:#737373;cursor:pointer;padding:0;font-size:11px;flex:none}
-.cx-row .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cx-row .sz{color:#a8a29e;font-size:12px;flex:none}
-.cx input[type=checkbox]{accent-color:#171717;width:15px;height:15px;margin:0;flex:none}
-.cx-set{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:11px 0;border-top:1px solid #f1f0ee}.cx-set:first-of-type{border-top:0}
-.cx-set b{font-weight:550;display:block;color:#171717}.cx-set small{color:#8a8580;font-size:12.5px;display:block}
-.cx .cx-f{border:1px solid #d6d3d1;background:#fff;color:#171717;border-radius:8px;padding:6px 10px;font:inherit;font-size:13px;min-width:170px;outline:0}.cx .cx-f:focus{border-color:#171717}
-.cx input.sw{appearance:none;-webkit-appearance:none;width:36px;height:21px;border-radius:99px;background:#d6d3d1;position:relative;cursor:pointer;transition:.15s;flex:none}
-.cx input.sw::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:#fff;transition:.15s;box-shadow:0 1px 2px #0003}.cx input.sw:checked{background:#171717}.cx input.sw:checked::after{left:17px}
-.cx-go{display:flex;align-items:center;gap:14px}.cx-go .info{flex:1}.cx-go .info b{font-size:15px;color:#171717}.cx-go .info small{display:block;color:#737373}
-.cx-bar{height:6px;border-radius:9px;background:#efeeec;overflow:hidden;margin-top:14px;display:none}.cx-bar i{display:block;height:100%;width:0;background:#171717;transition:width .15s}
-.cx-msg{margin-top:10px;color:#525252;font-size:13px}
-
+.cx-hd{display:flex;gap:12px;align-items:center;padding:16px 20px;border-bottom:1px solid #ffffff12;flex:none}.cx-hd img{width:34px;height:34px}
+.cx h1{font-size:17px;font-weight:600;margin:0;color:#fff;letter-spacing:-.01em}.cx-sub{color:#8b93a5;font-size:12.5px;margin:1px 0 0}
+.cx-main{flex:1;min-height:0;display:grid;grid-template-columns:1.1fr 1fr;gap:14px;padding:14px 20px}
+@media(max-width:720px){.cx-main{grid-template-columns:1fr;grid-template-rows:1fr 1fr}}
+.cx-pane{background:#14171e;border:1px solid #ffffff10;border-radius:14px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.cx-ph{display:flex;align-items:center;gap:6px;padding:10px 12px 10px 14px;border-bottom:1px solid #ffffff0d;flex:none}
+.cx-ph h2{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#8b93a5;font-weight:650;margin:0;flex:1}
+.cx-tree,.cx .sets{flex:1;overflow:auto;padding:6px;scrollbar-width:thin;scrollbar-color:#ffffff30 transparent}
+.cx .cx-btn{border:0;background:#ffffff0e;color:#c9cedb;border-radius:8px;padding:5px 10px;font:inherit;font-size:12px;cursor:pointer;transition:background .12s,transform .12s}
+.cx .cx-btn:hover{background:#ffffff1c;color:#fff}.cx .cx-btn:active{transform:scale(.97)}.cx .cx-btn:disabled{opacity:.4;pointer-events:none}
+.cx .cx-btn.pri{background:linear-gradient(135deg,var(--a,#3700ff),var(--b,#a600ff));color:#fff;font-weight:600;font-size:14px;padding:9px 24px;border-radius:10px;box-shadow:0 4px 16px #0006}
+.cx .cx-btn.pri:hover{filter:brightness(1.12)}
+.cx-row{display:flex;align-items:center;gap:8px;padding:3px 8px;border-radius:8px;min-height:30px;transition:background .1s}.cx-row:hover{background:#ffffff0a}
+.cx-row .tg{width:18px;height:18px;border:0;background:none;color:#7d8597;cursor:pointer;padding:0;font-size:10px;flex:none;border-radius:5px}.cx-row .tg:hover{background:#ffffff14;color:#fff}
+.cx-row img{width:16px;height:16px;flex:none}
+.cx-row .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cx-row .sz{color:#6b7385;font-size:11.5px;flex:none}
+.cx input[type=checkbox]:not(.sw){appearance:none;-webkit-appearance:none;width:16px;height:16px;border-radius:5px;border:1.5px solid #4a5163;background:transparent;margin:0;flex:none;cursor:pointer;transition:.12s;display:grid;place-items:center}
+.cx input[type=checkbox]:not(.sw):hover{border-color:#8b93a5}
+.cx input[type=checkbox]:not(.sw):checked,.cx input[type=checkbox]:not(.sw):indeterminate{background:var(--a,#3700ff);border-color:transparent}
+.cx input[type=checkbox]:not(.sw):checked::after{content:"";width:8px;height:4px;border:2px solid #fff;border-top:0;border-right:0;transform:rotate(-45deg) translate(1px,-1px)}
+.cx input[type=checkbox]:not(.sw):indeterminate::after{content:"";width:8px;height:2px;background:#fff;border-radius:2px}
+.cx-set{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 8px;border-radius:9px}.cx-set+.cx-set{border-top:1px solid #ffffff08}
+.cx-set b{font-weight:550;display:block;color:#eef0f6;font-size:13px}.cx-set small{color:#7d8597;font-size:11.5px;display:block;line-height:1.35}
+.cx .cx-f{border:1px solid #ffffff1a;background:#0c0e13;color:#e8eaf0;border-radius:8px;padding:6px 9px;font:inherit;font-size:12.5px;min-width:150px;max-width:170px;outline:0;transition:border-color .12s}.cx .cx-f:focus{border-color:var(--a,#3700ff)}
+.cx input.sw{appearance:none;-webkit-appearance:none;width:34px;height:20px;border-radius:99px;background:#2b3040;position:relative;cursor:pointer;transition:.15s;flex:none;margin:0}
+.cx input.sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#cfd4e0;transition:.15s}.cx input.sw:checked{background:var(--a,#3700ff)}.cx input.sw:checked::after{left:16px;background:#fff}
+.cx-ft{flex:none;border-top:1px solid #ffffff12;padding:12px 20px 14px;background:#0f1218;position:relative}
+.cx-go{display:flex;align-items:center;gap:12px}.cx-go .info{flex:1;min-width:0}.cx-go .info b{font-size:14.5px;color:#fff;font-weight:600}.cx-go .info small{display:block;color:#7d8597;font-size:12px}
+.cx-bar{position:absolute;left:0;right:0;top:-1px;height:2px;background:#ffffff10;overflow:hidden;display:none}.cx-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--a,#3700ff),var(--b,#a600ff));transition:width .15s}
+.cx-msg{color:#8b93a5;font-size:12px;margin-top:6px;min-height:0}.cx-msg:empty{display:none}
+.cx-empty{color:#6b7385;padding:18px;text-align:center}
 `);
 
 
@@ -57,10 +63,10 @@ const MB=1048576;
 
 function renderCloud(body,w){
  const cfg=cxLoad(),save=()=>CXS.set(cfg);
- body.innerHTML=`<div class=cx><div class=cx-in><div class=cx-hd><img src="${IC('cloud-export')}"><div><h1>Cloud Export</h1><p class=cx-sub>Send your files to your computer as a single zip.</p></div></div>
- <div class=cx-card><h2>1 · Choose what to export</h2><p>Tick folders or individual files. Only files you have access to are shown.</p><div class=cx-tools><button class=cx-btn data-a=all>Select all</button><button class=cx-btn data-a=none>Clear</button><button class=cx-btn data-a=open>Expand all</button><button class=cx-btn data-a=shut>Collapse</button><span class=cnt></span></div><div class=cx-tree></div></div>
- <div class=cx-card><h2>2 · Settings</h2><div class=sets></div></div>
- <div class=cx-card><div class=cx-go><div class=info><b class=sum>Nothing selected</b><small class=det></small></div><button class="cx-btn" data-a=reset>Reset settings</button><button class="cx-btn pri" data-a=go>Export</button></div><div class=cx-bar><i></i></div><div class=cx-msg></div></div></div></div>`;
+ body.innerHTML=`<div class=cx><div class=cx-hd><img src="${IC('cloud-export')}"><div><h1>Cloud Export</h1><p class=cx-sub>Pack your files into a zip and download it.</p></div></div>
+ <div class=cx-main><div class=cx-pane><div class=cx-ph><h2>Files</h2><button class=cx-btn data-a=all>Select all</button><button class=cx-btn data-a=none>Clear</button><button class=cx-btn data-a=open>Expand</button><button class=cx-btn data-a=shut>Collapse</button></div><div class=cx-tree></div></div>
+ <div class=cx-pane><div class=cx-ph><h2>Settings</h2><button class=cx-btn data-a=reset>Reset</button></div><div class=sets></div></div></div>
+ <div class=cx-ft><div class=cx-bar><i></i></div><div class=cx-go><div class=info><b class=sum>Nothing selected</b><small class=det></small></div><button class="cx-btn pri" data-a=go>Export</button></div><div class=cx-msg></div></div></div>`;
  const q=s=>body.querySelector(s),tree=q('.cx-tree'),chk=new Set(),open=new Set();
  const root=()=>FS.home();
  const kids=id=>FS.kids(id).slice().sort((a,b)=>(a.t===b.t?0:a.t==='d'?-1:1)||a.n.localeCompare(b.n,undefined,{numeric:true}));
@@ -72,9 +78,9 @@ function renderCloud(body,w){
    const cb=H('input','',r);cb.type='checkbox';
    if(m.t==='d'){const[c,t]=stat(m.id);cb.checked=t?c===t:chk.has(m.id);cb.indeterminate=c>0&&c<t}else cb.checked=chk.has(m.id);
    cb.onchange=()=>{toggle(m.id,cb.checked);draw();sum()};
-   H('span','nm',r).textContent=(m.t==='d'?'📁 ':'')+m.n;if(m.t==='f')H('span','sz',r).textContent=fmtSz(m.s||0);
+   H('img','',r).src=IC(m.t==='d'?'folder-single':'file-generic');H('span','nm',r).textContent=m.n;if(m.t==='f')H('span','sz',r).textContent=fmtSz(m.s||0);
    if(m.t==='d'&&open.has(m.id))walk(m.id,depth+1)}};
-  walk(root(),0);if(!tree.children.length)tree.innerHTML='<div class=cx-row style="color:#a8a29e">No files yet.</div>';sum()}
+  walk(root(),0);if(!tree.children.length)tree.innerHTML='<div class=cx-empty>No files yet.</div>';sum()}
  const exSet=()=>new Set(cfg.excl.toLowerCase().split(/[,\s]+/).map(x=>x.replace(/^\./,'')).filter(Boolean));
  function plan(){const ex=exSet(),lim=cfg.maxSize*MB,files=[],dirs=[],base=root();
   const rel=id=>{const a=[];let x=id;while(x&&x!==base){const m=FS.get(x);if(!m)break;a.push(m.n);x=m.p}return a.reverse()};
@@ -85,7 +91,7 @@ function renderCloud(body,w){
   return{files,dirs,size:files.reduce((a,f)=>a+(f.m.s||0),0)}}
  function sum(){const p=plan(),n=p.files.length;q('.sum').textContent=n?`${n} file${n>1?'s':''} · ${fmtSz(p.size)}`:'Nothing selected';
   const parts=cfg.split&&p.size?Math.ceil(p.size/(cfg.split*MB)):1;q('.det').textContent=n?(parts>1?`About ${parts} zip parts`:'One zip file')+(cfg.comp==='deflate'?' · compressed':' · uncompressed'):'Tick something above to begin';
-  q('.cnt').textContent=chk.size?'':'';q('[data-a=go]').disabled=!n}
+  q('[data-a=go]').disabled=!n}
  /* settings */
  const sets=q('.sets');
  const row=(t,d,el)=>{const r=H('div','cx-set',sets,`<div><b></b><small></small></div>`);r.querySelector('b').textContent=t;r.querySelector('small').textContent=d;r.append(el);return el};
@@ -129,6 +135,6 @@ function renderCloud(body,w){
  FS.ready.then(()=>{toggle(root(),true);chk.delete(root());for(const k of kids(root()))if(k.t==='d')open.add(k.id);draw()});
  const off=FS.on(()=>{if(w.el.isConnected)draw()});const oc=w.onclose;w.onclose=()=>{off();oc&&oc()};
 }
-const CLOUD_APP={name:'Cloud Export',icon:'cloud-export',w:820,h:620,cat:'utilities',perms:['fs'],noctx:true,render:renderCloud};
+const CLOUD_APP={name:'Cloud Export',icon:'cloud-export',w:860,h:600,cat:'utilities',perms:['fs'],noctx:true,render:renderCloud};
 Apps.installable({id:'cloud-export',name:'Cloud Export',icon:'cloud-export',tag:'Utilities',tagline:'Export your files to your computer as a zip',by:'Reitzel',desc:'Cloud Export packs some or all of your files into a zip and sends it to your main computer. Pick exactly what to include, choose compression, split large exports into parts, skip hidden or oversized files and more.',versions:[{v:'1.0.0'}]},{'cloud-export':CLOUD_APP});
 })();
