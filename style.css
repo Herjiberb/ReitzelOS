@@ -251,3 +251,13 @@ body.noanim *{transition:none!important;animation:none!important}#tb.nodate .dt{
 .sk.tight{--lw:220px;--pw:270px}.sk.tight .sk-rail{width:58px;padding:8px 4px}.sk.tight .sk-sp span,.sk.tight .sk-logo{display:none}
 .sk.tiny{--lw:min(78%,240px);--pw:230px}.sk.tiny .sk-rail{width:46px;padding:6px 2px}.sk.tiny .sk-sp img{width:24px}.sk.tiny .sk-sw{display:none}.sk.tiny .sk-top{padding:8px;gap:8px}.sk.tiny .sk-pvc{padding:10px}
 .sk-dlg{display:flex;gap:8px;align-items:center;padding:8px 10px;border-top:2px solid var(--cream);background:#00000066;flex:none}.sk-dlg input{flex:1;min-width:0;padding:6px 10px;background:#15151f;border:2px solid var(--cream);color:var(--cream);font:inherit;outline:0}
+
+/* ---- polish ---- */
+.tbb{transition:transform .15s cubic-bezier(.2,.8,.3,1),background .15s;touch-action:none}.tbb:hover{transform:translateY(-2px)}.tbb:active{transform:scale(.94)}
+.tbb.drg{transition:none;z-index:9;opacity:.85;transform-origin:center;box-shadow:0 6px 18px #0008;position:relative}
+.tbb.drg:hover{transform:none}
+button,.btn,.gi,.st-card{transition:background .15s,transform .12s,filter .15s}
+.btn:active,.gi:active,.st-card:active{transform:scale(.97)}
+.st-card:hover{transform:translateY(-2px)}
+*{scrollbar-width:thin;scrollbar-color:#ffffff30 transparent}
+:focus-visible{outline:2px solid color-mix(in srgb,var(--a,#3700ff) 70%,#fff);outline-offset:1px}
