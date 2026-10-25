@@ -694,7 +694,7 @@ function renderTerm(body,w){const P0=prof(),user=P0.root?'root':(P0.name||'user'
    cur+=c;has=true}
   if(q)throw Error('syntax error: unterminated quote');push();return o}
  function group(tk){const seqs=[];let cur={pipe:[{argv:[]}],op:';'},rd=null;for(const x of tk){if(x.op==='|')cur.pipe.push({argv:[]});else if(x.op===';'||x.op==='&&'){seqs.push(cur);cur={pipe:[{argv:[]}],op:x.op}}else if(x.op==='>'||x.op==='>>')rd=x.op;else{const c=cur.pipe[cur.pipe.length-1];if(rd){c.redir={m:rd,f:x.w};rd=null}else c.argv.push(x)}}if(rd)throw Error('syntax error: expected a file name after '+rd);seqs.push(cur);return seqs}
- async function call(name,args,stdin,el){const c=CMD[name];if(!c)throw Error(name+': command not found'+(CMD[name.toLowerCase()]?' (did you mean '+name.toLowerCase()+'?)':'  — try `help` or `fag`'));if(PRIV.has(name)&&!el)throw Error(name+': permission denied (try: swat '+name+')');
+ async function call(name,args,stdin,el){const c=CMD[name];if(!c)throw Error(name+': command not found'+(CMD[name.toLowerCase()]?' (did you mean '+name.toLowerCase()+'?)':'  — try `help`'));if(PRIV.has(name)&&!el)throw Error(name+': permission denied (try: swat '+name+')');
   if(args.includes('--help'))return TK('a',name)+' — '+c.d+'\n  usage: '+c.u;return await c.f(args,{stdin,el,t})}
  async function runLine(line,quiet){let seqs;try{seqs=group(tokenize(line))}catch(x){e_(x.message);t.last=2;return}
   for(const sq_ of seqs){if(sq_.op==='&&'&&t.last!==0)continue;t.last=0;let stdin=null;
