@@ -18,7 +18,9 @@ const FS=(()=>{
   isIn(id,anc){while(id){if(id===anc)return true;const m=M.get(id);id=m&&m.p}return false},
   async init(){db=await odb();const t=db.transaction('n'),q=t.objectStore('n').getAll();await done(t);const all=q.result;
    all.filter(m=>m.t==='d').forEach(link);all.filter(m=>m.t!=='d').forEach(link);
-   if(!M.has('root')){const now=Date.now(),ns=[{id:'root',p:null,n:'',t:'d',s:0,m:now}];link(ns[0]);for(const n of['Documents','Pictures','Downloads','Desktop']){const m={id:nid(),p:'root',n,t:'d',s:0,m:now};link(m);ns.push(m)}await persist(ns,[],[])}
+   if(!M.has('root')){const ns=[{id:'root',p:null,n:'',t:'d',s:0,m:Date.now()}];link(ns[0]);await persist(ns,[],[])}
+   M.get('root').lock=1;
+   for(const[n,ro]of[['.system',1],['home',0]])if(!K.get('root').has(n)){const m=await R.mkdir('root',n,ro);m.lock=1;await persist([m],[],[])}
    F.syncSys()},
   async mkdir(p,n,ro){const m={id:nid(),p,n:F.uniq(p,n),t:'d',s:0,m:Date.now()};if(ro)m.ro=1;link(m);await persist([m],[],[]);return m},
   async write(p,n,blob,id,ro,by){let m=id&&M.get(id);if(m){m.s=blob.size;m.m=Date.now();await persist([m],[[m.id,blob]],[],by);return m}
@@ -32,14 +34,67 @@ const FS=(()=>{
    await persist(ns,pairs.map(([a,b],i)=>[b,rs[i].result]).filter(x=>x[1]),[]);return ns.length},
   async del(ids){const del=[];const rec=id=>{const m=M.get(id);if(!m)return;if(m.t==='d')[...K.get(id).values()].forEach(rec);unlink(m);M.delete(id);K.delete(id);del.push(id)};ids.forEach(rec);await persist([],[],del);return del.length},
   async blob(id){const t=db.transaction('d'),q=t.objectStore('d').get(id);await done(t);return q.result||new Blob([])},
-  search(root,q,hidden,limit=20000){q=q.toLowerCase();const out=[],st=[root];while(st.length&&out.length<limit){const d=st.pop();const k=K.get(d);if(!k)continue;for(const[ln,id]of k){if(!hidden&&ln[0]==='.')continue;if(ln.includes(q))out.push(M.get(id));const m=M.get(id);if(m.t==='d')st.push(id)}}return out},
-  count(id){let n=0,sz=0;const st=[id];while(st.length){const k=K.get(st.pop());if(k)for(const c of k.values()){const m=M.get(c);n++;sz+=m.s||0;if(m.t==='d')st.push(c)}}return[n,sz]},
-  async syncSys(){try{let sys=F.resolve('/.system');sys=sys?M.get(sys):await F.mkdir('root','.system',1);let as=K.get(sys.id).get('assets');as=as?M.get(as):await F.mkdir(sys.id,'assets',1);
+  search(root,q,hidden,limit=20000){q=q.toLowerCase();const out=[],st=[root];while(st.length&&out.length<limit){const d=st.pop();const k=K.get(d);if(!k)continue;for(const[ln,id]of k){if(!hidden&&ln[0]==='.')continue;if(!canR(M.get(id)))continue;if(ln.includes(q))out.push(M.get(id));const m=M.get(id);if(m.t==='d')st.push(id)}}return out},
+  count(id){let n=0,sz=0;const st=[id];while(st.length){const k=K.get(st.pop());if(k)for(const c of k.values()){const m=M.get(c);if(!canR(m))continue;n++;sz+=m.s||0;if(m.t==='d')st.push(c)}}return[n,sz]},
+  async syncSys(){try{let sys=M.get(K.get('root').get('.system'));let as=K.get(sys.id).get('assets');as=as?M.get(as):await R.mkdir(sys.id,'assets',1);
    const files=['index.html','style.css','os.js','apps.js','sw.js'],assets=['reitzel','folder','folder-single','compass-settings','network','editor','file-image','file-generic','file-scout','tote-store','terminal'].map(x=>x+'-icon.svg');
    for(const[par,list,pf]of[[sys,files,''],[as,assets,'assets/']])for(const f of list){try{const r=await fetch(pf+f);if(!r.ok)continue;const b=await r.blob(),old=K.get(par.id).get(f);
-    if(old&&M.get(old).s===b.size)continue;if(old)await F.write(null,f,b,old);else await F.write(par.id,f,b,null,1)}catch{}}
+    if(old&&M.get(old).s===b.size)continue;if(old)await R.write(null,f,b,old);else await R.write(par.id,f,b,null,1)}catch{}}
    }catch(e){console.error('sys sync',e)}}
- };return F})();
+ };
+ /* ===== universal access-control middleman: every app (Files, Editor, Terminal, dialogs, shortcuts) goes through these checks ===== */
+ const R={};['get','kids','resolve','mkdir','write','writeMany','rename','move','copy','del','blob','search'].forEach(k=>R[k]=F[k]);F.raw=R;
+ let WHO=()=>null;F.setWho=f=>{WHO=f};F.who=()=>WHO();
+ const LEG=new Set(['documents','pictures','downloads','desktop']),dirId=(par,n)=>{const k=K.get(par);return k&&k.get(n)};F.dirId=dirId;
+ F.homesId=()=>dirId('root','home');F.sysId=()=>dirId('root','.system');
+ F.home=u=>{u=u||WHO();return u&&u.home&&M.has(u.home)?u.home:'root'};
+ const roUp=m=>{while(m){if(m.ro)return true;m=M.get(m.p)}return false};
+ const canR=m=>{const u=WHO();if(!m||!u)return false;if(u.admin)return true;if(m.id==='root'||m.id===F.homesId())return true;const s=F.sysId();if(s&&F.isIn(m.id,s))return true;return!!(u.home&&F.isIn(m.id,u.home))};
+ const canW=m=>{const u=WHO();if(!m||!u||roUp(m))return false;if(u.admin)return true;return!!(u.home&&F.isIn(m.id,u.home))};
+ F.canRead=id=>canR(M.get(id));F.canWrite=id=>canW(M.get(id));
+ const deny=m=>{throw Error('Permission denied'+(m&&m.n?': '+m.n:''))};
+ const needR=id=>{const m=M.get(id);if(!m||!canR(m))deny(m);return m};
+ const needW=id=>{const m=M.get(id);if(!m||!canW(m))deny(m);return m};
+ const frozen=id=>{const m=M.get(id);if(!m)return false;if(m.lock||m.ro)return true;const k=K.get(id);return k?[...k.values()].some(frozen):false};
+ F.get=id=>{const m=M.get(id);return m&&canR(m)?m:undefined};
+ F.kids=id=>{const m=M.get(id);return m&&canR(m)?R.kids(id).filter(canR):[]};
+ F.resolve=(p,from)=>{if(p&&p[0]==='/'){const q=p.split('/').filter(Boolean);if(q.length&&LEG.has(q[0].toLowerCase())&&!dirId('root',q[0].toLowerCase()))p=F.path(F.home())+'/'+q.join('/')}const id=R.resolve(p,from||F.home()),m=id&&M.get(id);return m&&canR(m)?id:null};
+ F.mkdir=async(p,n)=>{needW(p);if(!F.valid(n))throw Error('Invalid name');return R.mkdir(p,n)};
+ F.write=async(p,n,blob,id,ro,by)=>{if(id){const m=needW(id);if(m.t!=='f')throw Error('Not a file')}else{const d=needW(p);if(d.t!=='d')deny(d);if(!F.valid(n))throw Error('Invalid name')}return R.write(p,n,blob,id,0,by)};
+ F.writeMany=async list=>{list.forEach(([p])=>needW(p));return R.writeMany(list)};
+ F.rename=async(id,n)=>{const m=needW(id);if(m.lock)deny(m);return R.rename(id,n)};
+ F.move=async(ids,np)=>{needW(np);ids.forEach(id=>{const m=needW(id);if(m.lock||frozen(id))deny(m)});return R.move(ids,np)};
+ F.copy=async(ids,np)=>{needW(np);ids.forEach(needR);return R.copy(ids,np)};
+ F.del=async ids=>{ids.forEach(id=>{const m=needW(id);if(m.lock||frozen(id))deny(m)});return R.del(ids)};
+ F.blob=async id=>{needR(id);return R.blob(id)};
+ F.search=(root,q,h,l)=>canR(M.get(root))?R.search(root,q,h,l).filter(canR):[];
+ /* ===== user homes, per-user config files, legacy migration ===== */
+ const sane=n=>String(n).toLowerCase().replace(/[^a-z0-9_-]+/g,'')||'user',APPN={files:'My Files',editor:'Text Editor',store:'App Store',settings:'Settings',terminal:'Terminal','file-scout':'File Scout'};
+ const lock=async(m,ro)=>{m.lock=1;if(ro)m.ro=1;await persist([m],[],[]);return m};
+ const shJSON=l=>JSON.stringify({format:'reitzel-shortcuts',version:1,shortcuts:l},null,2);
+ const DEFSC=()=>[['files',0],['editor',1],['store',2],['settings',3]].map(([a,r])=>({name:APPN[a],target:a,kind:'app',c:0,r}));
+ F.provision=async(p,defaults)=>{let h=p.home&&M.get(p.home);if(!h){const par=p.root?'root':F.homesId();h=await lock(await R.mkdir(par,p.root?'root':sane(p.name)));p.home=h.id}
+  for(const n of['Desktop','Documents','Pictures','Downloads','.config'])if(!dirId(h.id,n.toLowerCase()))await lock(await R.mkdir(h.id,n),n==='.config');
+  const d=dirId(h.id,'desktop');if(defaults&&!dirId(d,'shortcuts.syst'))await R.write(d,'shortcuts.syst',new Blob([shJSON(DEFSC())]));return h};
+ F.removeHome=async p=>{if(p.home&&M.has(p.home))await R.del([p.home]);delete lastCfg[p.id]};
+ F.renameHome=async p=>{try{const h=p.home&&M.get(p.home);if(h&&!p.root&&sane(p.name)!==h.n){const n=F.uniq(h.p,sane(p.name),h.id);await R.rename(h.id,n)}}catch(e){console.error(e)}};
+ const lastCfg={},CK=['avatar','letters','bg','lockbg','prefs'],cfgDir=p=>{const h=p.home&&M.get(p.home);return h&&dirId(h.id,'.config')};
+ F.writeCfg=async p=>{try{const c=cfgDir(p);if(!c)return;const o={format:'reitzel-user',version:1,name:p.name};CK.forEach(k=>o[k]=p[k]===undefined?null:p[k]);const t=JSON.stringify(o);if(lastCfg[p.id]===t)return;lastCfg[p.id]=t;const f=dirId(c,'user.json'),b=new Blob([t]);if(f)await R.write(null,null,b,f,0,'cfg');else await R.write(c,'user.json',b,null,0,'cfg')}catch(e){console.error('cfg',e)}};
+ F.readCfg=async p=>{try{const c=cfgDir(p),f=c&&dirId(c,'user.json');if(!f)return false;const t=await(await R.blob(f)).text(),j=JSON.parse(t);if(!j||j.format!=='reitzel-user')return false;
+  const str=v=>typeof v==='string'||v===null;if(str(j.avatar))p.avatar=j.avatar;if(str(j.bg))p.bg=j.bg;if(str(j.lockbg))p.lockbg=j.lockbg;if(typeof j.letters==='boolean')p.letters=j.letters;if(j.prefs&&typeof j.prefs==='object'&&!Array.isArray(j.prefs))p.prefs=j.prefs;lastCfg[p.id]=t;return true}catch(e){console.error('cfg read',e);return false}};
+ F.boot=async S=>{const P=S.profiles;if(!P.length)return;if(!P.some(p=>p.root))P[0].root=true;P.forEach(p=>{if(p.root)p.admin=true});
+  const legacy=!S.fsv,rp=P.find(p=>p.root);
+  for(const p of[rp,...P.filter(x=>x!==rp)])await F.provision(p,!(legacy&&p===rp));
+  if(legacy){const hd=rp.home,keep=new Set(['.system','home','root']);
+   for(const n of[...K.get('root').keys()]){if(keep.has(n))continue;const id=K.get('root').get(n),tgt=LEG.has(n)?dirId(hd,n):hd;if(LEG.has(n)&&M.get(id).t==='d'){const ch=[...K.get(id).values()];if(ch.length)await R.move(ch,tgt);await R.del([id])}else await R.move([id],hd)}
+   const d=dirId(hd,'desktop'),legacyDesk=(S.desk||[]).filter(x=>x&&!x.fsc&&x.app&&Number.isInteger(x.c)&&Number.isInteger(x.r));let j=null,f=dirId(d,'shortcuts.syst');
+   if(f)try{j=JSON.parse(await(await R.blob(f)).text())}catch{j=null}
+   if(!j||!Array.isArray(j.shortcuts)){if(f)j=null;j={format:'reitzel-shortcuts',version:1,shortcuts:legacyDesk.length||f?[]:DEFSC()}}
+   legacyDesk.forEach(x=>{if(!j.shortcuts.some(y=>y.kind==='app'&&y.target===x.app))j.shortcuts.push({name:x.name||APPN[x.app]||x.app,target:x.app,kind:'app',c:x.c,r:x.r})});
+   if(f&&j.shortcuts.length||!f)await R.write(f?null:d,f?null:'shortcuts.syst',new Blob([shJSON(j.shortcuts)]),f||null);
+   S.desk=[];S.fsv=2;for(const p of P)await F.writeCfg(p)}
+  else for(const p of P)await F.readCfg(p)};
+return F})();
 FS.ready=FS.init();
 /* ---------- zip (native: CRC32 + optional browser deflate) ---------- */
 const ZIP=(()=>{const T=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;T[n]=c>>>0}
@@ -104,7 +159,7 @@ async function pump(){while(thr<3&&thq.length){const[m,img,px,k]=thq.shift();if(
 function openInEditor(id){const w=W.find(x=>x.app==='editor');if(w){focusW(w);w.edOpen(id)}else openApp('editor',{tab:id})}
 /* ---------- My Files ---------- */
 const FMV={list:{w:0,h:30},large:{w:132,h:150,i:96},medium:{w:100,h:112,i:64},small:{w:78,h:86,i:36}};
-function renderFiles(body,w,dlg){const P=S.fm||(S.fm={view:'medium',hidden:false,ext:true}),st={cur:'root',hist:['root'],hi:0,q:'',items:[],sel:new Set(),anchor:-1,sort:{k:'n',d:1},tok:0};
+function renderFiles(body,w,dlg){const P=S.fm||(S.fm={view:'medium',hidden:false,ext:true}),st={cur:FS.home(),hist:[FS.home()],hi:0,q:'',items:[],sel:new Set(),anchor:-1,sort:{k:'n',d:1},tok:0};
  body.innerHTML=`<div class=fm><div class=fm-top><button class=bk title=Back>←</button><button class=fw title=Forward>→</button><button class=up title="Up">↑</button><input class="in fm-addr" spellcheck=false placeholder="Search here, or type a path starting with /"><span class=vwh></span><button class=hd title="Show hidden files">Hidden</button><button class=ex title="Show file extensions">.ext</button></div><div class=fm-main><div class=fm-side></div><div class=fm-view><div class=fm-hd></div><div class=fm-vs><div class=fm-sp></div></div></div></div>${dlg?'<div class=fm-dlg></div>':''}<div class=fm-st><span class=s1></span><span class=s2></span></div></div>`;
  const q=s=>$(s,body),addr=q('.fm-addr'),vs=q('.fm-vs'),sp=q('.fm-sp'),hd=q('.fm-hd'),fm=q('.fm'),rendered=new Map();let cols=1,dim=FMV[P.view],raf=0;
  const nameOf=m=>P.ext||m.t==='d'?m.n:FS.split(m.n)[0];
@@ -126,8 +181,8 @@ function renderFiles(body,w,dlg){const P=S.fm||(S.fm={view:'medium',hidden:false
  const sched=()=>{if(!raf)raf=requestAnimationFrame(draw)};vs.addEventListener('scroll',sched);new ResizeObserver(sched).observe(vs);
  const paint=()=>{dlgSync();rendered.forEach((e,i)=>{const m=st.items[i];e.classList.toggle('sel',!!m&&st.sel.has(m.id));e.classList.toggle('cut',!!m&&FSclip.cut&&FSclip.ids.includes(m.id))});stat()};
  function stat(){const n=st.items.length,sn=st.sel.size;let t=n+' item'+(n===1?'':'s');if(st.q)t=n+' result'+(n===1?'':'s')+' for “'+st.q+'” in '+pathTxt();if(sn){let sz=0;st.sel.forEach(i=>{const m=FS.get(i);if(m&&m.t==='f')sz+=m.s});t+=' · '+sn+' selected'+(sz?' ('+fmtSz(sz)+')':'')}q('.s1').textContent=t;q('.s2').textContent=ro()?'Read-only system location':''}
- function side(){const s=q('.fm-side');s.innerHTML='<small>Places</small>';const pl=[['Home','root','folder-single']];['Desktop','Documents','Pictures','Downloads'].forEach(n=>{const i=FS.K.get('root').get(n.toLowerCase());i&&pl.push([n,i,'folder-single'])});pl.forEach(([n,id,ic])=>{const b=H('button',FS.isIn(st.cur,id)&&(id!=='root'||st.cur==='root')?'on':'',s,`<img src="${IC(ic)}"><span>${n}</span>`);b.onclick=()=>go(id)})}
- function go(id,nh){if(!FS.get(id))id='root';st.cur=id;st.q='';st.sel.clear();st.anchor=-1;if(!nh){st.hist=st.hist.slice(0,st.hi+1);if(st.hist[st.hi]!==id){st.hist.push(id);st.hi++}}addr.value=pathTxt();vs.scrollTop=0;side();nav();load()}
+ function side(){const s=q('.fm-side');s.innerHTML='<small>Places</small>';const pl=[['Home',FS.home(),'folder-single']];['Desktop','Documents','Pictures','Downloads'].forEach(n=>{const i=FS.K.get(FS.home()).get(n.toLowerCase());i&&pl.push([n,i,'folder-single'])});pl.push(['File system','root','folder']);pl.forEach(([n,id,ic])=>{const b=H('button',FS.isIn(st.cur,id)&&(id!=='root'||st.cur==='root')&&(id!==FS.home()||st.cur===id||!pl.some(x=>x[1]!==id&&x[1]!=='root'&&FS.isIn(st.cur,x[1])))?'on':'',s,`<img src="${IC(ic)}"><span>${n}</span>`);b.onclick=()=>go(id)})}
+ function go(id,nh){if(!FS.get(id))id=FS.home();st.cur=id;st.q='';st.sel.clear();st.anchor=-1;if(!nh){st.hist=st.hist.slice(0,st.hi+1);if(st.hist[st.hi]!==id){st.hist.push(id);st.hi++}}addr.value=pathTxt();vs.scrollTop=0;side();nav();load()}
  function nav(){q('.bk').disabled=st.hi<=0;q('.fw').disabled=st.hi>=st.hist.length-1;q('.up').disabled=st.cur==='root'}
  q('.bk').onclick=()=>{if(st.hi>0)go(st.hist[--st.hi],1)};q('.fw').onclick=()=>{if(st.hi<st.hist.length-1)go(st.hist[++st.hi],1)};q('.up').onclick=()=>go(FS.get(st.cur).p||'root');
  const tog=(b,k)=>{b.classList.toggle('on',!!P[k]);b.onclick=()=>{P[k]=!P[k];b.classList.toggle('on',!!P[k]);save();load()}};tog(q('.hd'),'hidden');tog(q('.ex'),'ext');q('.vwh').replaceWith(dropdown([['list','List'],['large','Large'],['medium','Medium'],['small','Small']],P.view,v=>{P.view=v;save();full()}));
@@ -264,7 +319,7 @@ function renderEditor(body,w){body.innerHTML=`<div class=ed><div class=ed-side><
 /* ---------- App Store ---------- */
 const CATALOG=[{id:'file-scout',name:'File Scout',icon:'file-scout',tag:'Utilities',tagline:'A clean, customizable file manager',by:'Reitzel',desc:'File Scout is a clean, highly customizable file manager with tabs, dual panes and your own layouts. Browse your files exactly the way you like.',versions:[{v:'1.0.0'}],reg(){APPS['file-scout']=SCOUT_APP}}];
 const SCOUT_APP={name:'File Scout',icon:'file-scout',w:1000,h:600,render:renderScout};
-window.regInstalled=()=>{if(S.installed&&S.installed['file-scout'])APPS['file-scout']=SCOUT_APP};
+window.regInstalled=()=>{if(S.installed&&S.installed['file-scout'])APPS['file-scout']=SCOUT_APP;else delete APPS['file-scout']};
 const inst=()=>S.installed||(S.installed={});
 function uninstall(id){delete inst()[id];S.pins=(S.pins||[]).filter(x=>x!==id);S.desk=(S.desk||[]).filter(x=>x.app!==id);SC.dropApp(id);W.filter(x=>x.app===id).forEach(closeW);delete APPS[id];save();renderTB();desk()}
 function renderStore(body){body.innerHTML=`<div class=st><div class=st-nav><h2><img src="${IC('tote-store')}">App Store</h2><button data-t=d>Discover</button><button data-t=i>Installed</button></div><div class=st-main></div></div>`;
@@ -282,7 +337,7 @@ function renderStore(body){body.innerHTML=`<div class=st><div class=st-nav><h2><
  draw()}
 /* ---------- desktop icons & shortcuts (/Desktop/shortcuts.syst) ---------- */
 const SC=(()=>{const NAME='shortcuts.syst';let items=[],bad=false,loaded=false,inj=false,last='',fid=null,q=Promise.resolve(),lt=0,sq=0;
- const dId=()=>FS.K.get('root').get('desktop'),fileId=()=>{const d=dId();return d&&FS.K.get(d).get(NAME)||null};
+ const dId=()=>{const h=FS.home();return h!=='root'&&FS.K.get(h)?FS.K.get(h).get('desktop'):null},uname=b=>{let n=2,v=b;const has=x=>items.some(i=>i.name.toLowerCase()===x.toLowerCase());while(has(v))v=b+' ('+n++ +')';return v},fileId=()=>{const d=dId();return d&&FS.K.get(d).get(NAME)||null};
  const ok=j=>j&&typeof j==='object'&&j.format==='reitzel-shortcuts'&&Array.isArray(j.shortcuts)&&j.shortcuts.every(s=>s&&typeof s==='object'&&typeof s.name==='string'&&s.name&&typeof s.target==='string'&&s.target&&(s.kind==='app'||((s.kind==='file'||s.kind==='folder')&&s.target[0]==='/'))&&Number.isInteger(s.c)&&Number.isInteger(s.r)&&s.c>=0&&s.r>=0);
  const mk=s=>{const id='f'+(sq++)+'_'+Date.now().toString(36),b={id,fsc:1,app:'__sc',kind:s.kind,name:s.name,path:s.target,c:s.c,r:s.r};
   if(s.kind==='app'){const a=APPS[s.target];b.icon=a?a.icon:'file-generic';b.hidden=!a;return b}
@@ -291,7 +346,7 @@ const SC=(()=>{const NAME='shortcuts.syst';let items=[],bad=false,loaded=false,i
  last=ser([]);
  const redraw=()=>{try{if(S&&S.desk)desk()}catch{}};
  async function load(){bad=false;fid=fileId();let list=[];if(fid){try{const j=JSON.parse(await(await FS.blob(fid)).text());if(ok(j))list=j.shortcuts.map(mk);else bad=true}catch{bad=true}}items=list;last=bad?'':ser(items);loaded=true;redraw()}
- function write(){if(bad)return;const s=ser(items);if(s===last)return;last=s;q=q.then(async()=>{const f=fileId(),b=new Blob([s]);if(f)await FS.write(null,null,b,f,0,'desk');else{let d=dId();if(!d)d=(await FS.mkdir('root','Desktop')).id;await FS.write(d,NAME,b,null,0,'desk')}fid=fileId()}).catch(console.error)}
+ function write(){if(bad)return;const s=ser(items);if(s===last)return;last=s;q=q.then(async()=>{const f=fileId(),b=new Blob([s]);if(f)await FS.write(null,null,b,f,0,'desk');else{const d=dId();if(d)await FS.write(d,NAME,b,null,0,'desk')}fid=fileId()}).catch(console.error)}
  window.deskPre=()=>{if(loaded&&!bad&&S.desk.some(x=>!x.fsc)){S.desk.filter(x=>!x.fsc&&APPS[x.app]).forEach(x=>items.push(mk({kind:'app',target:x.app,name:x.name||APPS[x.app].name,c:x.c,r:x.r})));S.desk=S.desk.filter(x=>x.fsc);write();setTimeout(()=>save(),0)}
   if(loaded&&!bad){S.desk=S.desk.filter(x=>!x.fsc).concat(items.filter(x=>!x.hidden));inj=true}else if(bad){S.desk=S.desk.filter(x=>!x.fsc)}};
  window.deskHook=()=>{if(!inj||!S||!S.desk)return;items=S.desk.filter(x=>x.fsc).concat(items.filter(x=>x.hidden));write()};
@@ -299,8 +354,9 @@ const SC=(()=>{const NAME='shortcuts.syst';let items=[],bad=false,loaded=false,i
  FS.ready.then(()=>{load();FS.on(ev=>{if(ev.by==='desk')return;if(fileId()!==fid||(fid&&ev.ids.includes(fid))||items.some(x=>x.kind!=='app'&&ev.ids.includes(FS.resolve(x.path)))){clearTimeout(lt);lt=setTimeout(load,60)}})});
  const place=it=>{const G=grid(),tk=new Set();S.desk.forEach(o=>o.dc!=null&&tk.add(o.dc+','+o.dr));for(let c=0;c<G.c;c++)for(let r=0;r<G.r;r++)if(!tk.has(c+','+r)){it.c=c;it.r=r;return true}return false};
  const put=(it,msg)=>{if(bad)return RZ.toast('shortcuts.syst is malformed — fix or delete it first');if(!loaded)return RZ.toast('Desktop is still loading');if(!place(it))return RZ.toast('Desktop is full');items.push(it);S.desk.push(it);write();desk();RZ.toast(msg)};
- return{add(m){if(!m)return;const path=FS.path(m.id);if(items.some(x=>x.path===path))return RZ.toast('Already on the desktop');put(mk({name:m.n,target:path,kind:m.t==='d'?'folder':'file',c:0,r:0}),'Shortcut added to desktop')},
-  addApp(app){if(items.some(x=>x.kind==='app'&&x.path===app))return RZ.toast('Already on the desktop');put(mk({name:APPS[app].name,target:app,kind:'app',c:0,r:0}),'Added to desktop')},
+ return{add(m){if(!m)return;const path=FS.path(m.id);put(mk({name:uname(m.n),target:path,kind:m.t==='d'?'folder':'file',c:0,r:0}),'Shortcut added to desktop')},
+  addApp(app){put(mk({name:uname(APPS[app].name),target:app,kind:'app',c:0,r:0}),'Added to desktop')},
+  reload(){loaded=false;bad=false;items=[];fid=null;last=ser([]);if(FS.who())load()},
   dropApp(id){items=items.filter(x=>!(x.kind==='app'&&x.path===id));write()}}})();
 /* ---------- open-with registry & shared FS helpers ---------- */
 const MEDIA=m=>m.t==='f'&&(IMG.has(EXT(m.n))||VID.has(EXT(m.n))||AUD.has(EXT(m.n)));
@@ -325,7 +381,7 @@ const SKCOL=['#ff3d8b','#c8ff2e','#34e8ff','#ffb300','#a678ff','#ff5a4d'];let sk
 function renderScout(body,w){const SS=S.scout||(S.scout={spots:[],tags:{},sort:'n',hid:false});
  body.innerHTML=`<div class=sk tabindex=0><div class=sk-rail></div><div class=sk-main><div class=sk-top><div class=sk-logo>SCOUT</div><div class=sk-pill><span>⌕</span><input class=sk-q spellcheck=false placeholder="jump to anything…   Ctrl+K"><div class=sk-res></div></div><span class=sk-sw></span><button class="sk-b sk-hid" title="Show dotfiles">dots</button></div><div class=sk-lanes></div><div class=sk-tray></div><div class=sk-foot></div></div></div>`;
  const q=s=>$(s,body),sk=q('.sk'),lanesEl=q('.sk-lanes'),qi=q('.sk-q'),res=q('.sk-res'),trayEl=q('.sk-tray'),foot=q('.sk-foot');
- const st={chain:['root'],lane:0,sel:new Set(),anchor:-1,lanes:[],pv:null,pvKey:''};let pvUrl=null,pvTok=0,rf=0;
+ const st={chain:[FS.home()],lane:0,sel:new Set(),anchor:-1,lanes:[],pv:null,pvKey:''};let pvUrl=null,pvTok=0,rf=0;
  const err=x=>RZ.toast(x.message||String(x)),sels=()=>[...st.sel].map(i=>FS.get(i)).filter(Boolean);
  const kidsOf=id=>{let l=id==='@flag'?Object.keys(SS.tags).map(i=>FS.get(i)).filter(Boolean):FS.kids(id);return SS.hid?l:l.filter(m=>m.n[0]!=='.')};
  const C=new Intl.Collator(undefined,{numeric:true,sensitivity:'base'});
@@ -337,7 +393,7 @@ function renderScout(body,w){const SS=S.scout||(S.scout={spots:[],tags:{},sort:'
   $('small',e).textContent=m.t==='d'?(FS.K.get(m.id)?FS.K.get(m.id).size:0)+'':fmtSz(m.s);const t=SS.tags[m.id];$('u',e).style.background=t||'transparent';$('u',e).style.borderColor=t||'#ffffff30';paintRow(e,L,m);return e}
  function paintRow(e,L,m){e.classList.toggle('sel',L.i===st.lane&&st.sel.has(m.id));e.classList.toggle('trail',st.chain[L.i+1]===m.id&&!(L.i===st.lane&&st.sel.has(m.id)))}
  function mkLane(i,id){const L={i,id,items:[],rows:new Map()},el=L.el=H('div','sk-lane'),hd=H('div','sk-lh',el),sc=L.sc=H('div','sk-ls',el),sp=H('div','',sc);sp.style.cssText='position:absolute;left:0;top:0;width:1px;pointer-events:none';let rq=0;
-  L.load=()=>{L.items=kidsOf(id).sort(cmp());hd.innerHTML='';H('b','',hd).textContent=id==='@flag'?'FLAGGED':id==='root'?'HOME':(FS.get(id)||{n:'?'}).n;H('i','',hd).textContent=L.items.length;L.rows.forEach(e=>e.remove());L.rows.clear();L.draw()};
+  L.load=()=>{L.items=kidsOf(id).sort(cmp());hd.innerHTML='';H('b','',hd).textContent=id==='@flag'?'FLAGGED':id===FS.home()?'HOME':(FS.get(id)||{n:'?'}).n;H('i','',hd).textContent=L.items.length;L.rows.forEach(e=>e.remove());L.rows.clear();L.draw()};
   L.draw=()=>{rq=0;const h=34,n=L.items.length;sp.style.height=n*h+'px';const a=Math.max(0,Math.floor(sc.scrollTop/h)-3),b=Math.min(n,Math.ceil((sc.scrollTop+sc.clientHeight)/h)+3);L.rows.forEach((e,k)=>{if(k<a||k>=b){e.remove();L.rows.delete(k)}});for(let k=a;k<b;k++)if(!L.rows.has(k)){const e=row(L,k);sc.append(e);L.rows.set(k,e)}};
   L.paint=()=>L.rows.forEach((e,k)=>L.items[k]&&paintRow(e,L,L.items[k]));
   sc.addEventListener('scroll',()=>{if(!rq)rq=requestAnimationFrame(L.draw)});
@@ -393,9 +449,9 @@ function renderScout(body,w){const SS=S.scout||(S.scout={spots:[],tags:{},sort:'
   smenu(e,{head:one?one.n:ms.length+' things',tiles:[['↗','OPEN',()=>ms.forEach(x=>openIt(x,i))],['⎘','CARRY',()=>carry(false)],['✂','MOVE',()=>carry(true),lock],['▣','STASH',()=>stash(ms),lock]],flags:c=>flag(ms,c),apps:openersFor(ms),ow:a=>ms.forEach(a.open),
    items:[...(one?[['Rename',()=>rename(one),'F2',lock&&'dis']]:[['Batch rename…',()=>batch(ms),'',lock&&'dis']]),...(one&&/\.zip$/i.test(one.n)?[['Unstash here',()=>unstash(one)]]:[]),...(one&&one.t==='d'?[['Make a Spot',()=>spot(one)]]:[]),...(one&&one.t==='f'?[['Download',()=>down(one)]]:[]),['-'],['Delete',del,'Del',lock?'dis':'dng']]})}
  function laneMenu(e,i){const L=st.lanes[i];if(!L||L.id==='@flag')return;st.sel.clear();st.lane=i;st.chain=st.chain.slice(0,i+1);sync();const d=FS.get(L.id),ro=d.ro;
-  smenu(e,{head:L.id==='root'?'HOME':d.n,tiles:[['✚','FOLDER',newFolder,ro],['✎','NOTE',newNote,ro],['⤵','DROP',drop,ro||!FSclip.ids.length],['⇪','IMPORT',imp,ro]],apps:openersFor([d]),ow:a=>a.open(d),items:[['Select everything',()=>{L.items.forEach(m=>st.sel.add(m.id));st.lane=i;L.paint();preview();foot_()},'Ctrl+A'],['Make this a Spot',()=>spot(d)],['Refresh',refresh]]})}
+  smenu(e,{head:L.id===FS.home()?'HOME':d.n,tiles:[['✚','FOLDER',newFolder,ro],['✎','NOTE',newNote,ro],['⤵','DROP',drop,ro||!FSclip.ids.length],['⇪','IMPORT',imp,ro]],apps:openersFor([d]),ow:a=>a.open(d),items:[['Select everything',()=>{L.items.forEach(m=>st.sel.add(m.id));st.lane=i;L.paint();preview();foot_()},'Ctrl+A'],['Make this a Spot',()=>spot(d)],['Refresh',refresh]]})}
  /* rail, tray, footer, sort */
- function rail(){const r=q('.sk-rail');r.innerHTML='';const sp=[['HOME','root','folder']];for(const n of['desktop','documents','pictures','downloads']){const i=FS.K.get('root').get(n);i&&sp.push([FS.get(i).n.toUpperCase(),i,'folder-single'])}SS.spots.filter(i=>FS.get(i)).forEach(i=>sp.push([FS.get(i).n.toUpperCase().slice(0,9),i,'folder-single',1]));sp.push(['FLAGGED','@flag','',0,'⚑']);
+ function rail(){const r=q('.sk-rail');r.innerHTML='';const sp=[['HOME',FS.home(),'folder']];for(const n of['desktop','documents','pictures','downloads']){const i=FS.K.get(FS.home()).get(n);i&&sp.push([FS.get(i).n.toUpperCase(),i,'folder-single'])}SS.spots.filter(i=>FS.get(i)).forEach(i=>sp.push([FS.get(i).n.toUpperCase().slice(0,9),i,'folder-single',1]));sp.push(['FLAGGED','@flag','',0,'⚑']);
   const cur=st.chain[st.chain.length-1];sp.forEach(([n,id,ic,u,g])=>{const b=H('button','sk-sp'+(cur===id||(id!=='root'&&st.chain.includes(id)&&id!=='@flag')?' on':''),r,(g?`<b>${g}</b>`:`<img src="${IC(ic)}">`)+`<span></span>`);$('span',b).textContent=n;b.onclick=()=>goto(id);if(u)b.oncontextmenu=e=>{e.preventDefault();e.stopPropagation();smenu(e,{head:n,items:[['Remove this Spot',()=>{SS.spots=SS.spots.filter(x=>x!==id);save();rail()},'','dng']]})}})}
  function tray(){const n=FSclip.ids.filter(i=>FS.get(i)).length;trayEl.style.display=n?'flex':'none';if(!n)return;trayEl.innerHTML='';H('b','',trayEl,FSclip.cut?'MOVING':'CARRYING');FSclip.ids.filter(i=>FS.get(i)).slice(0,5).forEach(i=>H('span','',trayEl).textContent=FS.get(i).n);if(n>5)H('em','',trayEl,'+'+(n-5));H('button','sk-b pri',trayEl,'DROP HERE').onclick=drop;H('button','sk-b',trayEl,'CLEAR').onclick=()=>{FSclip.ids=[];tray()}}
  function foot_(){const ms=sels(),d=curDir();let sz=0;ms.forEach(m=>sz+=m.t==='f'?m.s:0);foot.textContent=(d?FS.path(d):'flagged')+'  ·  '+(st.lanes[st.lane]?st.lanes[st.lane].items.length:0)+' here'+(ms.length?'  ·  '+ms.length+' picked'+(sz?' ('+fmtSz(sz)+')':''):'')}
@@ -417,21 +473,21 @@ function renderScout(body,w){const SS=S.scout||(S.scout={spots:[],tags:{},sort:'
   else if((e.key==='ArrowLeft'||e.key==='Backspace')&&st.lane>0){const d=FS.get(st.chain[st.lane]);d&&pick(st.lane-1,d)}});
  sk.addEventListener('pointerdown',e=>{if(!e.target.closest('input,button,.sk-menu'))sk.focus({preventScroll:true})});
  const offFs=FS.on(()=>{if(!body.isConnected){offFs();return}clearTimeout(rf);rf=setTimeout(refresh,90)});
- FS.ready.then(()=>{const t=w.tab&&FS.get(w.tab);if(t)goto(t.t==='d'?t.id:t.p,t.t==='d'?null:t.id);else goto('root');rail()});
+ FS.ready.then(()=>{const t=w.tab&&FS.get(w.tab);if(t)goto(t.t==='d'?t.id:t.p,t.t==='d'?null:t.id);else goto(FS.home());rail()});
 }
-const cl=(v,a,b)=>Math.max(a,Math.min(b,v));
+
 /* ---------- Terminal ---------- */
 const TK=(k,t)=>'\u0001'+k+t+'\u0002',TKS=s=>String(s).replace(/\u0001.([^\u0002]*)\u0002/g,'$1'),ESC=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const TKH=s=>ESC(s).replace(/\u0001(.)([^\u0002]*)\u0002/g,'<span class="tk-$1">$2</span>');
 const SWAT_JOKES=[u=>`${u} is not in the swatters file. This incident will be reported to Santa.`,u=>`swat: Linus Torvalds has been notified. He is composing a very strongly worded email about ${u}.`,u=>`swat: nice try, ${u}. Even \`rm -rf --no-preserve-root /\` needs an admin badge.`,u=>`swat: access denied. ${u} has been added to the naughty list, right next to the guy who ran chmod -R 777 /.`,u=>`swat: ${u}, with great power comes great responsibility. You have neither. (Ask an admin.)`];
 const PRIV=new Set(['reboot','poweroff','shutdown','useradd','userdel']);
 const mkl=()=>{const d=document.createElement('div');d.className='tm-l';return d};
-function renderTerm(body,w){const P0=prof(),user=(P0.name||'user').toLowerCase().replace(/[^a-z0-9_-]+/g,'')||'user';
- const t={cwd:w.tab&&w.tab.cwd&&FS.get(w.tab.cwd)?w.tab.cwd:'root',env:{USER:user,HOME:'/',SHELL:'/bin/rzsh',TERM:'reitzel-256',EDITOR:'edit'},alias:{ll:'ls -l',la:'ls -a','..':'cd ..',cls:'clear',nano:'edit',l:'ls -l'},auth:false,last:0,busy:false,abort:false,hi:-1,askr:null,t0:Date.now()};
+function renderTerm(body,w){const P0=prof(),user=P0.root?'root':(P0.name||'user').toLowerCase().replace(/[^a-z0-9_-]+/g,'')||'user';
+ const t={cwd:w.tab&&w.tab.cwd&&FS.get(w.tab.cwd)?w.tab.cwd:FS.home(),env:{USER:user,HOME:FS.path(FS.home()),SHELL:'/bin/rzsh',TERM:'reitzel-256',EDITOR:'edit'},alias:{ll:'ls -l',la:'ls -a','..':'cd ..',cls:'clear',nano:'edit',l:'ls -l'},auth:false,last:0,busy:false,abort:false,hi:-1,askr:null,t0:Date.now()};
  const H0=S.thist||(S.thist=[]);
  body.innerHTML='<div class=tm><div class=tm-out><div class=tm-pr><span class=tm-p></span><input class=tin spellcheck=false autocomplete=off autocapitalize=off></div></div></div>';
  const out=$('.tm-out',body),pr=$('.tm-pr',body),pp=$('.tm-p',body),inp=$('.tin',body),tmEl=$('.tm',body);
- const shortPath=()=>{const p=FS.path(t.cwd);return p==='/'?'~':'~'+p};
+ const shortPath=()=>{const h=FS.path(FS.home()),p=FS.path(t.cwd);return p===h?'~':p.startsWith(h+'/')?'~'+p.slice(h.length):p};
  const promptHtml=()=>`<span class=tk-u>${ESC(user)}@reitzel</span><span class=tk-m>:</span><span class=tk-p>${ESC(shortPath())}</span><span class=tk-m>$ </span>`;
  const setP=()=>{pp.innerHTML=promptHtml();const ti=$('.tbar span',w.el);if(ti)ti.textContent=user+'@reitzel: '+shortPath()};
  const scroll=()=>{out.scrollTop=out.scrollHeight};
@@ -439,7 +495,7 @@ function renderTerm(body,w){const P0=prof(),user=(P0.name||'user').toLowerCase()
  const e_=s=>emit(TK('e',s));
  const asked=(label,secret)=>new Promise(r=>{t.askr=r;pp.textContent=label;inp.type=secret?'password':'text';pr.style.display='flex';inp.value='';inp.focus()});
  /* path helpers */
- const P2=p=>p.replace(/^~(?=\/|$)/,'/');
+ const P2=p=>p.replace(/^~(?=\/|$)/,()=>FS.path(FS.home()));
  const look=p=>{const id=FS.resolve(P2(p),t.cwd);return id?FS.get(id):null};
  const need=p=>{const m=look(p);if(!m)throw Error(`${p}: No such file or directory`);return m};
  const parentOf=p=>{p=P2(p).replace(/\/+$/,'')||'/';const i=p.lastIndexOf('/'),dp=i<0?'.':(p.slice(0,i)||'/'),name=p.slice(i+1),d=look(dp);if(!d||d.t!=='d')throw Error(`${p}: No such directory`);if(!name||name==='.'||name==='..')throw Error(`${p}: invalid name`);return{dir:d,name}};
@@ -529,8 +585,8 @@ function renderTerm(body,w){const P0=prof(),user=(P0.name||'user').toLowerCase()
  def('sleep','Tools','Wait a number of seconds','sleep <seconds>',async a=>{const n=Math.min(+a[0]||0,600);for(let i=0;i<n*10;i++){if(t.abort)throw Error('^C');await sleep(100)}return''});
  def('neofetch','Fun','System summary, ReitzelOS style','neofetch',async()=>{const[n,s]=FS.count('root'),A=x=>TK('a',x),B=x=>TK('u',x);const logo=['  ╭───────────╮','  │  ╭─╮ ╭──╮ │','  │  ├─╯ ╰─╮│ │','  │  │ ╭─╮ ││ │','  │  ╵ ╵ ╰─╯╵ │','  ╰───────────╯'].map(x=>A(x));const info=[B(user)+'@'+B('reitzel'),'─'.repeat(user.length+8),A('OS')+'       ReitzelOS',A('Shell')+'    rzsh (Terminal)',A('Files')+'    '+n+' items, '+hs(s),A('Windows')+'  '+W.length+' open',A('Apps')+'     '+Object.keys(APPS).filter(k=>!APPS[k].hide).length,A('Browser')+'  '+(navigator.userAgent.match(/(Firefox|Edg|Chrome|Safari)\/[\d.]+/)||['?'])[0],A('Role')+'     '+(prof().admin?'administrator':'standard user')];return info.map((l,i)=>(logo[i]||' '.repeat(19))+'   '+l).join('\n')});
  def('users','Admin','List profiles','users',async()=>S.profiles.map(p=>p.name+(p.admin?TK('m',' (admin)'):'')+(p.id===S.cur?TK('g','  ← you'):'')).join('\n'));
- def('useradd','Admin','Create a standard profile (needs swat)','swat useradd <name>',async a=>{if(!a[0])throw Error('usage: swat useradd <name>');if(S.profiles.some(p=>p.name.toLowerCase()===a[0].toLowerCase()))throw Error('useradd: that name is taken');S.profiles.push({id:Date.now(),name:a[0],avatar:null,letters:true,salt:'',hash:'',bg:null,lockbg:null,admin:false});save();return TK('g','created ')+a[0]});
- def('userdel','Admin','Delete a profile (needs swat)','swat userdel <name>',async a=>{const p=S.profiles.find(x=>x.name.toLowerCase()===(a[0]||'').toLowerCase());if(!p)throw Error('userdel: no such user');if(p.id===S.cur)throw Error('userdel: you can’t delete the profile you’re using');S.profiles=S.profiles.filter(x=>x!==p);save();return TK('g','deleted ')+p.name});
+ def('useradd','Admin','Create a standard profile (needs swat)','swat useradd <name>',async a=>{if(!a[0])throw Error('usage: swat useradd <name>');if(nameTaken(a[0],null))throw Error('useradd: that name is taken');await addProfile(a[0],false);return TK('g','created ')+a[0]+' (home: '+FS.path(S.profiles[S.profiles.length-1].home)+')'});
+ def('userdel','Admin','Delete a profile (needs swat)','swat userdel <name>',async a=>{const p=S.profiles.find(x=>x.name.toLowerCase()===(a[0]||'').toLowerCase());if(!p)throw Error('userdel: no such user');if(p.id===S.cur)throw Error("userdel: you can't delete the profile you're using");if(p.root)throw Error('userdel: the root profile cannot be deleted');await dropProfile(p);return TK('g','deleted ')+p.name});
  def('passwd','Admin','Change a password','passwd [user]   (others need swat)',async(a,c)=>{const me=prof(),p=a[0]?S.profiles.find(x=>x.name.toLowerCase()===a[0].toLowerCase()):me;if(!p)throw Error('passwd: no such user');if(p!==me&&!c.el)throw Error('passwd: you can only change your own password (try: swat passwd '+a[0]+')');const v=await asked('New password for '+p.name+' (empty to remove): ',true);if(v===null)throw Error('cancelled');await setPw(p,v);save();return TK('g',v?'password updated':'password removed')});
  def('reboot','Admin','Restart ReitzelOS (needs swat)','swat reboot',async()=>{setTimeout(()=>{RZleave=1;sessionStorage.setItem('rz-restart',1);location.reload()},400);return TK('w','restarting…')});
  def('poweroff','Admin','Power off (needs swat)','swat poweroff',async()=>{setTimeout(()=>powerOff(),400);return TK('w','powering off…')});CMD.shutdown=CMD.poweroff;
