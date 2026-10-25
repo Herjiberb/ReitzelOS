@@ -7,11 +7,21 @@ const load=()=>new Promise(res=>{const q=DB.transaction('kv').objectStore('kv').
 const bgv=d=>d?`url(${d})`:'linear-gradient(135deg,color-mix(in srgb,var(--a) 20%,#000),color-mix(in srgb,var(--b) 20%,#000) 50%,color-mix(in srgb,var(--c) 20%,#000))';
 const hash=async(pw,salt)=>{const d=new TextEncoder().encode(salt+'|'+pw);if(crypto.subtle){const b=await crypto.subtle.digest('SHA-256',d);return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}let h=5381;for(const c of d)h=(h*33^c)>>>0;return'f'+h};
 const setPw=async(p,v)=>{if(!v){p.salt=p.hash='';return}p.salt=[...crypto.getRandomValues(new Uint32Array(3))].join('-');p.hash=await hash(v,p.salt)};
-const factory=()=>{if(!confirm('Factory reset? This erases all profiles, passwords, wallpapers and settings.'))return;RZleave=1;try{DB.close()}catch{}localStorage.removeItem('rzos');const q=indexedDB.deleteDatabase('reitzel-os');q.onsuccess=q.onerror=q.onblocked=()=>location.reload()};
-const PK=['theme','corners','glass','nodate','noanim','pos','size','conn','loose','mil'],DP={theme:0,corners:'rounded',glass:.5,nodate:false,noanim:false,pos:'bottom',size:'compact',conn:false,loose:false,mil:false};let PL=null;
-const save=()=>{try{const lp=S.profiles.find(p=>p.id===PL);if(lp)lp.prefs=Object.fromEntries(PK.map(k=>[k,S[k]]));{const ds=S.desk;if(ds)S.desk=ds.filter(x=>!x.fsc);try{DB.transaction('kv','readwrite').objectStore('kv').put(S,'state')}finally{S.desk=ds}}window.deskHook&&window.deskHook()}catch(e){console.error(e)}};
-function loadPrefs(id){const p=S.profiles.find(x=>x.id===id),q=(p&&p.prefs)||{};PK.forEach(k=>S[k]=q[k]!==undefined?q[k]:DP[k]);S.glass=[0,.25,.5,.75,1].reduce((a,b)=>Math.abs(b-S.glass)<Math.abs(a-S.glass)?b:a);PL=id}
-function switchTo(id){save();S.cur=id;loadPrefs(id);applyVars();save()}
+const factory=async()=>{if(!await sysConfirm({title:'Factory reset?',msg:'This erases all profiles, passwords, files, wallpapers and settings.',ok:'Erase everything',danger:1}))return;RZleave=1;try{DB.close()}catch{}localStorage.removeItem('rzos');let n=2;const fin=()=>{if(--n<=0)location.reload()};for(const d of['reitzel-os','reitzel-fs']){const q=indexedDB.deleteDatabase(d);q.onsuccess=q.onerror=q.onblocked=fin}};
+const PK=['theme','corners','glass','nodate','noanim','pos','size','conn','loose','mil','pins','fm','scout','installed'],DP={theme:0,corners:'rounded',glass:.5,nodate:false,noanim:false,pos:'bottom',size:'compact',conn:false,loose:false,mil:false,pins:['files','editor','store','terminal','settings']};let PL=null;
+const cfgT={},UCK=['avatar','letters','bg','lockbg','prefs'];
+function saveCfg(){if(typeof FS==='undefined'||!FS.writeCfg)return;S.profiles.forEach(p=>{clearTimeout(cfgT[p.id]);cfgT[p.id]=setTimeout(()=>FS.writeCfg(p),300)})}
+const stripP=p=>{const o={...p};UCK.forEach(k=>delete o[k]);return o};
+const save=()=>{try{const lp=S.profiles.find(p=>p.id===PL);if(lp)lp.prefs=Object.fromEntries(PK.map(k=>[k,S[k]]));const o={...S};PK.forEach(k=>delete o[k]);delete o.desk;o.profiles=S.profiles.map(stripP);
+ if(typeof FS!=='undefined'&&FS.dirId&&S.fsv){try{DB.transaction('kv','readwrite').objectStore('kv').put(o,'state')}catch(e){console.error(e)}}else{const ds=S.desk;try{DB.transaction('kv','readwrite').objectStore('kv').put({...S,desk:ds&&ds.filter(x=>!x.fsc)},'state')}catch(e){console.error(e)}}
+ saveCfg();window.deskHook&&window.deskHook()}catch(e){console.error(e)}};
+function loadPrefs(id){const p=S.profiles.find(x=>x.id===id),q=(p&&p.prefs)||{};PK.forEach(k=>{const v=q[k]!==undefined?q[k]:DP[k];S[k]=v&&typeof v==='object'?JSON.parse(JSON.stringify(v)):v});S.glass=[0,.25,.5,.75,1].reduce((a,b)=>Math.abs(b-S.glass)<Math.abs(a-S.glass)?b:a);PL=id}
+function switchTo(id){save();if(id!==S.cur){W.forEach(w=>{try{w.onclose&&w.onclose()}catch{}w.el.remove()});W=[];closePop()}S.cur=id;loadPrefs(id);S.desk=[];(window.regInstalled&&window.regInstalled());(typeof SC!=='undefined'&&SC.reload());applyVars();renderTB();desk();save()}
+async function addProfile(name,admin){const p={id:Date.now()+Math.floor(Math.random()*999),name,avatar:null,letters:true,salt:'',hash:'',bg:null,lockbg:null,admin:!!admin};S.profiles.push(p);await FS.provision(p,true);save();return p}
+async function dropProfile(p){S.profiles=S.profiles.filter(x=>x!==p);await FS.removeHome(p);save()}
+function sysConfirm(o){return new Promise(res=>{const ov=H('div','md sys',document.body),b=H('div','mdb',ov);b.setAttribute('role','alertdialog');H('h4','',b).textContent=o.title;if(o.msg)H('p','',b).textContent=o.msg;const r=H('div','mdr',b),done=v=>{ov.remove();res(v)};
+ H('button','btn',r,'Cancel').onclick=()=>done(false);const ok=H('button','btn '+(o.danger?'dng':'pri'),r,o.ok||'OK');ok.onclick=()=>done(true);
+ ['pointerdown','click','contextmenu'].forEach(t=>ov.addEventListener(t,e=>{e.stopPropagation();if(t==='contextmenu')e.preventDefault()}));ov.onkeydown=e=>{e.stopPropagation();if(e.key==='Escape')done(false);if(e.key==='Enter')ok.click()};ov.tabIndex=-1;setTimeout(()=>ok.focus(),20)})}
 const nameTaken=(v,p)=>S.profiles.some(x=>x!==p&&x.name.trim().toLowerCase()===v.toLowerCase());
 const uniqueName=b=>{let n=2,v=b;while(nameTaken(v,null))v=b+' '+n++;return v};
 const prof=id=>S.profiles.find(p=>p.id===(id??S.cur))||S.profiles[0];
@@ -30,7 +40,7 @@ const APPS={files:{name:'My Files',icon:'folder',w:720,h:460,ctx:()=>[['New fold
  settings:{name:'Settings',icon:'compass-settings',w:820,h:540,render:renderSettings}};
 let W=[],zc=10,nid=1;
 /* ---------- windows ---------- */
-function openApp(id,opt){if(id==='files'&&!prof().admin)return toast('My Files requires an administrator');const a=APPS[id],A=area(),o=W.length%6*28;const el=H('div','win',$('#wins'));
+function openApp(id,opt){if(!APPS[id])return;const a=APPS[id],A=area(),o=W.length%6*28;const el=H('div','win',$('#wins'));
  const w={id:nid++,app:id,el,min:false,max:false,prev:null,tab:opt&&opt.tab,sr:null};w.lockCursor=()=>{try{const q=$('.body',el).requestPointerLock();q&&q.catch&&q.catch(()=>{});tb.classList.remove('show');toast('Cursor locked — press Esc to release')}catch{}};W.push(w);
  const bw=Math.min(a.w,A.w-20),bh=Math.min(a.h,A.h-20);Object.assign(el.style,{width:bw+'px',height:bh+'px',left:A.x+Math.max(0,(A.w-bw)/2+o-60)+'px',top:A.y+Math.max(0,(A.h-bh)/2+o-40)+'px'});
  el.innerHTML=`<div class=tbar><img src="${IC(a.icon)}"><span>${a.name}</span><button class="wb m">${X.min}</button><button class="wb mx"><i class=ic>${X.max}</i><div class=snapm></div></button><button class="wb x">${X.x}</button></div><div class=body></div>`+['n','s','e','w','ne','nw','se','sw'].map(d=>`<div class="rz ${d}" data-d=${d}></div>`).join('');
@@ -48,7 +58,7 @@ function genie(w,rev){if(S.noanim){if(!rev&&w.min)w.el.classList.add('min');retu
   kf.push({clipPath:`polygon(${L.concat(Q).join(',')})`,transform:`translate(${dx*sb}px,${dy*eo}px) scaleY(${1-.96*eo})`,opacity:t>.88?(1-t)/.12:1})}
  w.a&&w.a.cancel();e.classList.add('gen');const a=w.a=e.animate(rev?kf.reverse():kf,{duration:rev?460:520,easing:'linear',fill:'both'});
  a.onfinish=()=>{e.classList.remove('gen');if(!rev&&w.min)e.classList.add('min');a.cancel()}}
-function closeW(w){if(w.beforeClose&&w.beforeClose()&&!w.force&&!confirm("Close with unsaved changes?"))return;w.onclose&&w.onclose();w.el.classList.add('closing');W=W.filter(x=>x!==w);setTimeout(()=>w.el.remove(),200);renderTB()}
+function closeW(w){if(w.beforeClose&&w.beforeClose()&&!w.force){sysConfirm({title:'Unsaved changes',msg:'Close without saving?',ok:'Close anyway',danger:1}).then(ok=>{if(ok){w.force=1;closeW(w)}});return}w.onclose&&w.onclose();w.el.classList.add('closing');W=W.filter(x=>x!==w);setTimeout(()=>w.el.remove(),200);renderTB()}
 function toggleMax(w){const e=w.el,A=area();if(w.max){Object.assign(e.style,w.prev);w.max=false;e.classList.remove('max')}else{w.prev={left:e.style.left,top:e.style.top,width:e.style.width,height:e.style.height};Object.assign(e.style,{left:A.x+'px',top:A.y+'px',width:A.w+'px',height:A.h+'px'});w.sr=null;w.max=true;e.classList.add('max')}
  $('.ic',e).innerHTML=w.max?X.res:X.max;e.classList.add('snap');setTimeout(()=>e.classList.remove('snap'),200);focusW(w)}
 function snap(w,r){const A=area(),e=w.el;if(w.max){w.max=false;e.classList.remove('max');$('.ic',e).innerHTML=X.max}e.classList.add('snap');
@@ -111,11 +121,12 @@ function lockNow(keep){closePop();L.className='';const p=prof();L.style.setPrope
  if(sessionStorage.getItem('rz-restart')){sessionStorage.removeItem('rz-restart')}}
 function startIdle(){const r=()=>{clearTimeout(idle);idle=setTimeout(()=>{if(L.classList.contains('hide'))lockNow()},120000)};['pointerdown','keydown','pointermove'].forEach(e=>addEventListener(e,r));r()}
 function shutdownThen(next){closePop();clearTimeout(idle);const o=$('#off');o.onclick=null;o.style.display='grid';o.textContent='Shutting down…';W.forEach(w=>w.el.remove());W=[];setTimeout(()=>{o.style.display='none';next()},1400)}
-function delProfile(p){const self=p.id===S.cur;if(!confirm('Delete profile "'+p.name+'"?'+(self?' You will be signed out.':'')))return false;
- S.profiles=S.profiles.filter(x=>x!==p);if(S.profiles.length&&!S.profiles.some(x=>x.admin))S.profiles[0].admin=true;if(!self){save();return true}
- if(S.profiles.length){S.cur=S.profiles[0].id;loadPrefs(S.cur)}save();shutdownThen(()=>S.profiles.length?lockNow():setupProfile());return false}
-function setupProfile(){closePop();L.className='';L.style.setProperty('--bg',bgv(null));L.innerHTML='<div class=lbg></div><div class=login><h2>Create your profile</h2><small style="opacity:.7">The first profile is the administrator</small><div class=pw><input class=sn placeholder="Name" maxlength=24></div><div class=pw><input class=sp type=password placeholder="Password (optional)"></div><button class="btn pri go2">Create</button></div>';
- const nm=$('.sn',L),pw=$('.sp',L),go=async()=>{const v=nm.value.trim();if(!v){nm.focus();return}const p={id:Date.now(),name:v,avatar:null,letters:true,salt:'',hash:'',bg:null,lockbg:null,admin:true};await setPw(p,pw.value);S.profiles=[p];S.cur=p.id;loadPrefs(p.id);applyVars();save();lockNow()};
+async function delProfile(p,after){if(p.root)return toast('The root profile cannot be deleted');const self=p.id===S.cur;
+ if(!await sysConfirm({title:'Delete profile "'+p.name+'"?',msg:'Its home folder and all of its files, settings and shortcuts will be erased.'+(self?'\nYou will be signed out.':''),ok:'Delete',danger:1}))return;
+ await dropProfile(p);if(!self){after&&after();return}
+ S.cur=S.profiles[0].id;loadPrefs(S.cur);(typeof SC!=='undefined'&&SC.reload());save();shutdownThen(()=>lockNow())}
+function setupProfile(){closePop();L.className='';L.style.setProperty('--bg',bgv(null));L.innerHTML='<div class=lbg></div><div class=login><h2>Create your profile</h2><small style="opacity:.7">The first profile is the root administrator</small><div class=pw><input class=sn placeholder="Name" maxlength=24></div><div class=pw><input class=sp type=password placeholder="Password (optional)"></div><button class="btn pri go2">Create</button></div>';
+ const nm=$('.sn',L),pw=$('.sp',L),go=async()=>{const v=nm.value.trim();if(!v){nm.focus();return}const p={id:Date.now(),name:v,avatar:null,letters:true,salt:'',hash:'',bg:null,lockbg:null,admin:true,root:true};await setPw(p,pw.value);S.profiles=[p];S.cur=p.id;S.fsv=2;await FS.provision(p,true);loadPrefs(p.id);(typeof SC!=='undefined'&&SC.reload());applyVars();save();lockNow()};
  $('.go2',L).onclick=go;[nm,pw].forEach(i=>i.onkeydown=e=>{if(e.key==='Enter')go()});setTimeout(()=>nm.focus(),50)}
 function powerOff(){closePop();const o=$('#off');o.style.display='grid';o.textContent='Click to power on';W.forEach(w=>w.el.remove());W=[];o.onclick=()=>{o.style.display='none';lockNow()};lockNow()}
 /* ---------- wake lock ---------- */
@@ -146,17 +157,17 @@ function renderSettings(body,w){let tab=w.tab||'Personalization';w.setTab=t=>{ta
  const tg=(l,get,set)=>{const r=row(card(),l),i=H('input','',r);i.type='checkbox';i.checked=get();i.onchange=()=>{set(i.checked);ref()}};
  tg('Show date on taskbar',()=>!S.nodate,v=>S.nodate=!v);tg('Reduce animations',()=>!!S.noanim,v=>S.noanim=v)}
  if(tab==='Profiles'){const me=prof(),adm=!!me.admin;S.profiles.filter(p=>adm||p===me).forEach(p=>{const c=card(),r=row(c,'');r.firstChild.remove();const a=av(p);a.style.cssText='width:48px;height:48px;flex:none';r.append(a);
-   const n=H('input','in',r);n.value=p.name;n.onchange=()=>{const v=n.value.trim()||'User';if(nameTaken(v,p)){toast('That name is already used by another profile');n.value=p.name;return}p.name=v;ref()};
+   const n=H('input','in',r);n.value=p.name;n.onchange=()=>{const v=n.value.trim()||'User';if(nameTaken(v,p)){toast('That name is already used by another profile');n.value=p.name;return}p.name=v;FS.renameHome(p).then(()=>ref())};
    const pw=H('input','in',r);pw.placeholder=p.hash?'Password set (change)':'Set password (optional)';pw.type='password';pw.onchange=async()=>{await setPw(p,pw.value);ref()};
    const r2=H('div','rw',c);H('button','btn',r2,'Upload picture').onclick=()=>cropAvatar(pn,d=>{p.avatar=d;p.letters=false;ref()},draw);H('button','btn',r2,p.letters?'Use picture':'Use letter').onclick=()=>{if(p.letters&&!p.avatar)return;p.letters=!p.letters;ref()};
    if(p.hash)H('button','btn',r2,'Remove password').onclick=()=>{p.salt=p.hash='';ref()};
-   if(adm){const r3=row(c,'Administrator'),i=H('input','',r3);i.type='checkbox';i.checked=!!p.admin;i.onchange=()=>{if(!i.checked&&S.profiles.filter(x=>x.admin).length<2){toast('At least one administrator is required');i.checked=true;return}p.admin=i.checked;ref()};H('button','btn dng',r2,'Delete').onclick=()=>{if(delProfile(p))ref()}}});
-  if(adm)H('button','btn pri',pn,'+ Add profile').onclick=()=>{S.profiles.push({id:Date.now(),name:uniqueName('User'),avatar:null,letters:true,salt:'',hash:'',bg:null,lockbg:null,admin:false});ref()};else H('small','',pn,'Only administrators can add, remove or promote profiles.').style.opacity=.6}
+   if(adm){const r3=row(c,p.root?'Root administrator (locked)':'Administrator'),i=H('input','',r3);i.type='checkbox';i.checked=!!p.admin;i.disabled=!!p.root;i.onchange=()=>{if(p.root||(!i.checked&&S.profiles.filter(x=>x.admin).length<2)){toast('At least one administrator is required');i.checked=true;return}p.admin=i.checked;ref()};if(!p.root)H('button','btn dng',r2,'Delete').onclick=()=>delProfile(p,ref)}});
+  if(adm)H('button','btn pri',pn,'+ Add profile').onclick=async()=>{await addProfile(uniqueName('User'),false);ref()};else H('small','',pn,'Only administrators can add, remove or promote profiles. Your files live in your own home folder.').style.opacity=.6}
  if(tab==='Taskbar'){const c=card(),sel=(r,v,o,fn)=>seg(r,v,o,fn),chk=(l,k)=>{const r=row(c,l),i=H('input','',r);i.type='checkbox';i.checked=S[k];i.onchange=()=>{S[k]=i.checked;ref()}};
   sel(row(c,'Position'),S.pos,[['bottom','Bottom'],['left','Left'],['right','Right']],v=>{S.pos=v;ref()});sel(row(c,'Size'),S.size,[['compact','Compact'],['roomy','Roomy'],['luxurious','Luxurious']],v=>{S.size=v;ref()});
   chk('Connected taskbar (flush with the screen edge)','conn');chk('Loose taskbar (hidden until you move to its edge; overlays apps)','loose')}
  if(tab==='Time'){const c=card(),r=row(c,'24-hour (military) clock');const k=H('input','',r);k.type='checkbox';k.checked=S.mil;k.onchange=()=>{S.mil=k.checked;ref()}}
- if(tab==='System'){const c0=card(),r0=row(c0,'Immersive mode (fullscreen + capture browser shortcuts)'),k0=H('input','',r0);k0.type='checkbox';k0.checked=S.immersive;k0.onchange=()=>{S.immersive=k0.checked;save();if(k0.checked)immerse();else{document.fullscreenElement&&document.exitFullscreen();kunlock()}};if(prof().admin){const c=card(),r=row(c,'Factory reset — erases all profiles, passwords and settings');H('button','btn dng',r,'Reset').onclick=()=>{factory()}}}};draw()}
+ if(tab==='System'){const c0=card(),r0=row(c0,'Immersive mode (fullscreen + capture browser shortcuts)'),k0=H('input','',r0);k0.type='checkbox';k0.checked=S.immersive;k0.onchange=()=>{S.immersive=k0.checked;save();if(k0.checked)immerse();else{document.fullscreenElement&&document.exitFullscreen();kunlock()}};if(prof().root){const c=card(),r=row(c,'Factory reset — erases all profiles, passwords and settings');H('button','btn dng',r,'Reset').onclick=()=>{factory()}}}};draw()}
 /* ---------- layout, desktop, context menus ---------- */
 const TBH=()=>({compact:38,roomy:48,luxurious:66})[S.size],thick=()=>TBH()+(S.conn?0:16),CW=84,CH=92,PAD=14;
 function area(){const T=thick();let x=0,y=0,w=innerWidth,h=innerHeight;if(!S.loose){if(S.pos==='bottom')h-=T;else{w-=T;if(S.pos==='left')x=T}}return{x,y,w,h}}
@@ -171,7 +182,7 @@ const selIds=new Set();let deskEls=[];
 const paintSel=()=>deskEls.forEach(i=>i.el.classList.toggle('sel',selIds.has(i.key)));
 function desk(fit){window.deskPre&&window.deskPre();const d=$('#desk'),G=grid(),tk=new Set();d.innerHTML='';deskEls=[];S.desk.forEach(s=>s.dc=null);
  S.desk.forEach(s=>{let c=s.c,r=s.r;if((fit&&(c>=G.c||r>=G.r))||tk.has(c+','+r)){const f=freeCell(G,tk,Math.min(c,G.c-1),Math.min(r,G.r-1));if(!f)return;[c,r]=f;if(fit){s.c=c;s.r=r}}tk.add(c+','+r);s.dc=c;s.dr=r;
-  const a=s.fsc?{icon:s.icon,name:s.name}:APPS[s.app],nm=s.name||a.name,el=H('div','sc'+(s.fsc&&s.kind!=='app'?' fsc':'')+(selIds.has(s.id)?' sel':''),d,`<img src="${IC(a.icon)}"><span></span>`);$('span',el).textContent=nm;deskEls.push({key:s.id,el});el.style.left=G.x+PAD+c*CW+'px';el.style.top=G.y+PAD+r*CH+'px';
+  const a=s.fsc?{icon:s.icon,name:s.name}:APPS[s.app];if(!a)return;const nm=s.name||a.name,el=H('div','sc'+(s.fsc&&s.kind!=='app'?' fsc':'')+(selIds.has(s.id)?' sel':''),d,`<img src="${IC(a.icon)}"><span></span>`);$('span',el).textContent=nm;deskEls.push({key:s.id,el});el.style.left=G.x+PAD+c*CW+'px';el.style.top=G.y+PAD+r*CH+'px';
   let st=null,mv=0,lt=0,gr=[];el.ondblclick=()=>openS(s);
   el.onpointerdown=e=>{if(e.button)return;st=[e.clientX,e.clientY];mv=0;el.setPointerCapture(e.pointerId)};
   el.onpointermove=e=>{if(!st)return;const dx=e.clientX-st[0],dy=e.clientY-st[1];if(!mv){if(Math.hypot(dx,dy)<6)return;mv=1;gr=deskEls.filter(i=>i.el.classList.contains('sel')||i.el===el).map(i=>({e:i.el,l:i.el.offsetLeft,t:i.el.offsetTop}));gr.forEach(g=>g.e.classList.add('drag'))}gr.forEach(g=>{g.e.style.left=g.l+dx+'px';g.e.style.top=g.t+dy+'px'})};
@@ -236,6 +247,15 @@ addEventListener('mousedown',e=>{if(e.button===1)e.preventDefault()});
 /* ---------- boot ---------- */
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 (async()=>{try{DB=await idb();let s=await load();if(!s)try{s=JSON.parse(localStorage.getItem('rzos'))}catch{}
- if(s){S=s;if(S.bg){S.profiles[0].bg=S.bg;delete S.bg}for(const p of S.profiles)if(p.pw){await setPw(p,p.pw);delete p.pw}save();localStorage.removeItem('rzos')}}catch(e){console.error(e)}
- window.regInstalled&&regInstalled();S.pins??=['files','editor','store','terminal','settings'];S.desk??=[{id:1,app:'files',c:0,r:0},{id:2,app:'editor',c:0,r:1},{id:3,app:'store',c:0,r:2},{id:4,app:'settings',c:0,r:3}];S.pos??='bottom';S.loose??=false;S.immersive??=true;S.theme??=0;S.corners??='rounded';S.glass??=.5;if(!S.mig){const lg=Object.fromEntries(PK.map(k=>[k,S[k]!==undefined?S[k]:DP[k]]));S.profiles.forEach(p=>{if(!p.prefs)p.prefs={...lg}});S.mig=1}if(S.profiles.length&&!S.profiles.some(p=>p.admin))S.profiles[0].admin=true;if(S.profiles.length)loadPrefs(S.cur);addEventListener('resize',()=>{closePop();renderTB();refit(1)});addEventListener('keydown',e=>{if(!L.classList.contains('hide')&&e.ctrlKey&&e.altKey&&e.shiftKey&&e.code==='KeyX'){e.preventDefault();factory()}});
- if(S.profiles.length){applyTheme();desk();lockNow()}else{desk();setupProfile()}})();
+ if(s){S=s;if(S.bg){S.profiles[0].bg=S.bg;delete S.bg}for(const p of S.profiles)if(p.pw){await setPw(p,p.pw);delete p.pw}localStorage.removeItem('rzos')}}catch(e){console.error(e)}
+ S.profiles??=[];S.desk??=[];
+ if(!S.mig){const lg=Object.fromEntries(PK.map(k=>[k,S[k]!==undefined?S[k]:DP[k]]));S.profiles.forEach(p=>{if(!p.prefs)p.prefs={...lg}});S.mig=1}
+ /* legacy per-user data that used to be global */
+ if(!S.fsv&&S.profiles.length){const p0=S.profiles[0];p0.prefs=p0.prefs||{};['pins','fm','scout','installed'].forEach(k=>{if(S[k]!==undefined&&p0.prefs[k]===undefined)p0.prefs[k]=S[k]})}
+ try{FS.setWho(()=>S.profiles.find(p=>p.id===S.cur)||S.profiles[0]||null);await FS.ready;await FS.boot(S)}catch(e){console.error('boot',e)}
+ S.pos??='bottom';S.loose??=false;S.immersive??=true;S.theme??=0;S.corners??='rounded';S.glass??=.5;
+ if(S.profiles.length&&!S.profiles.some(p=>p.admin))S.profiles[0].admin=true;
+ if(S.profiles.length&&!S.profiles.some(p=>p.id===S.cur))S.cur=S.profiles[0].id;
+ if(S.profiles.length)loadPrefs(S.cur);(window.regInstalled&&window.regInstalled());(typeof SC!=='undefined'&&SC.reload());
+ addEventListener('resize',()=>{closePop();renderTB();refit(1)});addEventListener('keydown',e=>{if(!L.classList.contains('hide')&&e.ctrlKey&&e.altKey&&e.shiftKey&&e.code==='KeyX'){e.preventDefault();factory()}});
+ if(S.profiles.length){save();applyTheme();desk();lockNow()}else{desk();setupProfile()}})();
