@@ -191,6 +191,7 @@ function renderFiles(body,w,dlg){const P=S.fm||(S.fm={view:'medium',hidden:false
  if(dlg){const bar=q('.fm-dlg');bar.style.cssText='display:flex;gap:8px;align-items:center;padding:8px 10px;border-top:1px solid #ffffff14;flex:none';nameI=H('input','in',bar);nameI.style.cssText='flex:1;padding:6px 10px';nameI.value=dlg.name||'';nameI.placeholder=dlg.save?'File name':'Select a file';nameI.readOnly=!dlg.save;
   if(dlg.save){const c='.'+EXT(dlg.name||'');typeD=dropdown(DEXTS,DEXTS.some(x=>x[0]===c)?c:'');bar.append(typeD)}
   H('button','btn',bar,'Cancel').onclick=()=>closeW(w);H('button','btn pri',bar,dlg.save?'Save':'Open').onclick=dlgOk;nameI.onkeydown=e=>{e.stopPropagation();if(e.key==='Enter')dlgOk();else if(e.key==='Escape')closeW(w)};if(dlg.save)setTimeout(()=>{nameI.focus();nameI.setSelectionRange(0,FS.split(nameI.value)[0].length)},50)}
+ let rt=0;const offFs=FS.on(ev=>{if(!body.isConnected){offFs();return}if(!ev.ids.some(i=>{const m=FS.get(i);return !m||i===st.cur||FS.isIn(m.p,st.cur)}))return;clearTimeout(rt);rt=setTimeout(()=>{if(!FS.get(st.cur))return go('root');load();side()},80)});
  FS.ready.then(()=>{const t=!dlg&&w.tab&&FS.get(w.tab);if(t){if(t.t==='d')go(t.id);else{go(t.p||'root');st.sel=new Set([t.id]);paint();openItem(t)}}else go(dlg&&dlg.dir&&FS.get(dlg.dir)?dlg.dir:'root')});
 }
 /* ---------- Text Editor ---------- */
@@ -263,7 +264,7 @@ function renderEditor(body,w){body.innerHTML=`<div class=ed><div class=ed-side><
 /* ---------- App Store ---------- */
 const CATALOG=[{id:'file-scout',name:'File Scout',icon:'file-scout',tag:'Utilities',tagline:'A clean, customizable file manager',by:'Reitzel',desc:'File Scout is a clean, highly customizable file manager with tabs, dual panes and your own layouts. Browse your files exactly the way you like.',versions:[]}];
 const inst=()=>S.installed||(S.installed={});
-function uninstall(id){delete inst()[id];S.pins=(S.pins||[]).filter(x=>x!==id);S.desk=(S.desk||[]).filter(x=>x.app!==id);W.filter(x=>x.app===id).forEach(closeW);delete APPS[id];save();renderTB();desk()}
+function uninstall(id){delete inst()[id];S.pins=(S.pins||[]).filter(x=>x!==id);S.desk=(S.desk||[]).filter(x=>x.app!==id);SC.dropApp(id);W.filter(x=>x.app===id).forEach(closeW);delete APPS[id];save();renderTB();desk()}
 function renderStore(body){body.innerHTML=`<div class=st><div class=st-nav><h2><img src="${IC('tote-store')}">App Store</h2><button data-t=d>Discover</button><button data-t=i>Installed</button></div><div class=st-main></div></div>`;
  const main=$('.st-main',body);let tab='d',qy='',sel=null;
  const nav=()=>body.querySelectorAll('.st-nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===tab&&!sel));
@@ -277,23 +278,28 @@ function renderStore(body){body.innerHTML=`<div class=st><div class=st-nav><h2><
   if(tab==='d'){const s=H('input','in',main);s.placeholder='Search apps';s.value=qy;s.oninput=()=>{qy=s.value;list()};H('h3','',main).textContent='Discover';const g=H('div','st-grid',main);const list=()=>{g.innerHTML='';const r=CATALOG.filter(a=>(a.name+a.tagline+a.tag).toLowerCase().includes(qy.toLowerCase()));r.forEach(a=>card(a,g));if(!r.length)H('div','st-empty',g,'No apps found')};list();s.onkeydown=e=>e.stopPropagation()}
   else{H('h3','',main).textContent='Installed';const l=CATALOG.filter(a=>inst()[a.id]);if(!l.length)H('div','st-empty',main,'No apps installed yet');l.forEach(a=>{const r=H('div','st-row',main,`<img src="${IC(a.icon)}"><div><b></b><br><small style="opacity:.6"></small></div>`);$('b',r).textContent=a.name;$('small',r).textContent='Version '+inst()[a.id];H('button','btn',r,'Details').onclick=()=>{sel=a;draw()};H('button','btn dng',r,'Uninstall').onclick=()=>{uninstall(a.id);draw()}})}}
  draw()}
-/* ---------- desktop shortcuts (/Desktop/shortcuts.syst) ---------- */
-const SC=(()=>{const NAME='shortcuts.syst';let items=[],bad=false,last='',fid=null,q=Promise.resolve(),lt=0;
+/* ---------- desktop icons & shortcuts (/Desktop/shortcuts.syst) ---------- */
+const SC=(()=>{const NAME='shortcuts.syst';let items=[],bad=false,loaded=false,inj=false,last='',fid=null,q=Promise.resolve(),lt=0,sq=0;
  const dId=()=>FS.K.get('root').get('desktop'),fileId=()=>{const d=dId();return d&&FS.K.get(d).get(NAME)||null};
- const ok=j=>j&&typeof j==='object'&&j.format==='reitzel-shortcuts'&&Array.isArray(j.shortcuts)&&j.shortcuts.every(s=>s&&typeof s==='object'&&typeof s.name==='string'&&s.name&&typeof s.target==='string'&&s.target[0]==='/'&&(s.kind==='file'||s.kind==='folder')&&Number.isInteger(s.c)&&Number.isInteger(s.r)&&s.c>=0&&s.r>=0);
- const mk=(s,i)=>{const id=FS.resolve(s.target),m=id&&FS.get(id);return{id:'f'+i+'_'+s.target,fsc:1,app:'__sc',name:s.name,path:s.target,kind:s.kind,c:s.c,r:s.r,icon:m?iconOf(m):(s.kind==='folder'?'folder':'file-generic')}};
+ const ok=j=>j&&typeof j==='object'&&j.format==='reitzel-shortcuts'&&Array.isArray(j.shortcuts)&&j.shortcuts.every(s=>s&&typeof s==='object'&&typeof s.name==='string'&&s.name&&typeof s.target==='string'&&s.target&&(s.kind==='app'||((s.kind==='file'||s.kind==='folder')&&s.target[0]==='/'))&&Number.isInteger(s.c)&&Number.isInteger(s.r)&&s.c>=0&&s.r>=0);
+ const mk=s=>{const id='f'+(sq++)+'_'+Date.now().toString(36),b={id,fsc:1,app:'__sc',kind:s.kind,name:s.name,path:s.target,c:s.c,r:s.r};
+  if(s.kind==='app'){const a=APPS[s.target];b.icon=a?a.icon:'file-generic';b.hidden=!a;return b}
+  const i=FS.resolve(s.target),m=i&&FS.get(i);b.icon=m?iconOf(m):(s.kind==='folder'?'folder':'file-generic');return b};
  const ser=l=>JSON.stringify({format:'reitzel-shortcuts',version:1,shortcuts:l.map(x=>({name:x.name,target:x.path,kind:x.kind,c:x.c,r:x.r}))},null,2);
  last=ser([]);
  const redraw=()=>{try{if(S&&S.desk)desk()}catch{}};
- async function load(){bad=false;fid=fileId();let list=[];if(fid){try{const j=JSON.parse(await(await FS.blob(fid)).text());if(ok(j))list=j.shortcuts.map(mk);else bad=true}catch{bad=true}}items=list;last=bad?'':ser(items);redraw()}
+ async function load(){bad=false;fid=fileId();let list=[];if(fid){try{const j=JSON.parse(await(await FS.blob(fid)).text());if(ok(j))list=j.shortcuts.map(mk);else bad=true}catch{bad=true}}items=list;last=bad?'':ser(items);loaded=true;redraw()}
  function write(){if(bad)return;const s=ser(items);if(s===last)return;last=s;q=q.then(async()=>{const f=fileId(),b=new Blob([s]);if(f)await FS.write(null,null,b,f,0,'desk');else{let d=dId();if(!d)d=(await FS.mkdir('root','Desktop')).id;await FS.write(d,NAME,b,null,0,'desk')}fid=fileId()}).catch(console.error)}
- window.deskPre=()=>{S.desk=S.desk.filter(x=>!x.fsc).concat(items)};
- window.deskHook=()=>{if(!S||!S.desk)return;items=S.desk.filter(x=>x.fsc);write()};
- window.openShortcut=s=>{const id=FS.resolve(s.path),m=id&&FS.get(id);if(!m)return RZ.toast('Shortcut target not found: '+s.path);const e=EXT(m.n);if(m.t==='f'&&e!=='svg'&&(TXT.has(e)||!e))openInEditor(id);else openApp('files',{tab:id})};
- FS.ready.then(()=>{load();FS.on(ev=>{if(ev.by==='desk')return;if(fileId()!==fid||(fid&&ev.ids.includes(fid))||items.some(x=>ev.ids.includes(FS.resolve(x.path)))){clearTimeout(lt);lt=setTimeout(load,60)}})});
- return{add(m){if(!m)return;if(bad)return RZ.toast('shortcuts.syst is malformed — fix or delete it first');const path=FS.path(m.id);if(items.some(x=>x.path===path))return RZ.toast('Already on the desktop');
-  const G=grid(),tk=new Set();S.desk.forEach(o=>o.dc!=null&&tk.add(o.dc+','+o.dr));let pos=null;for(let c=0;c<G.c&&!pos;c++)for(let r=0;r<G.r;r++)if(!tk.has(c+','+r)){pos=[c,r];break}if(!pos)return RZ.toast('Desktop is full');
-  const it=mk({name:m.n,target:path,kind:m.t==='d'?'folder':'file',c:pos[0],r:pos[1]},items.length+Date.now());items.push(it);S.desk.push(it);write();desk();RZ.toast('Shortcut added to desktop')}}})();
+ window.deskPre=()=>{if(loaded&&!bad&&S.desk.some(x=>!x.fsc)){S.desk.filter(x=>!x.fsc&&APPS[x.app]).forEach(x=>items.push(mk({kind:'app',target:x.app,name:x.name||APPS[x.app].name,c:x.c,r:x.r})));S.desk=S.desk.filter(x=>x.fsc);write();setTimeout(()=>save(),0)}
+  if(loaded&&!bad){S.desk=S.desk.filter(x=>!x.fsc).concat(items.filter(x=>!x.hidden));inj=true}else if(bad){S.desk=S.desk.filter(x=>!x.fsc)}};
+ window.deskHook=()=>{if(!inj||!S||!S.desk)return;items=S.desk.filter(x=>x.fsc).concat(items.filter(x=>x.hidden));write()};
+ window.openShortcut=s=>{if(s.kind==='app'){APPS[s.path]&&openApp(s.path);return}const id=FS.resolve(s.path),m=id&&FS.get(id);if(!m)return RZ.toast('Shortcut target not found: '+s.path);const e=EXT(m.n);if(m.t==='f'&&e!=='svg'&&(TXT.has(e)||!e))openInEditor(id);else openApp('files',{tab:id})};
+ FS.ready.then(()=>{load();FS.on(ev=>{if(ev.by==='desk')return;if(fileId()!==fid||(fid&&ev.ids.includes(fid))||items.some(x=>x.kind!=='app'&&ev.ids.includes(FS.resolve(x.path)))){clearTimeout(lt);lt=setTimeout(load,60)}})});
+ const place=it=>{const G=grid(),tk=new Set();S.desk.forEach(o=>o.dc!=null&&tk.add(o.dc+','+o.dr));for(let c=0;c<G.c;c++)for(let r=0;r<G.r;r++)if(!tk.has(c+','+r)){it.c=c;it.r=r;return true}return false};
+ const put=(it,msg)=>{if(bad)return RZ.toast('shortcuts.syst is malformed — fix or delete it first');if(!loaded)return RZ.toast('Desktop is still loading');if(!place(it))return RZ.toast('Desktop is full');items.push(it);S.desk.push(it);write();desk();RZ.toast(msg)};
+ return{add(m){if(!m)return;const path=FS.path(m.id);if(items.some(x=>x.path===path))return RZ.toast('Already on the desktop');put(mk({name:m.n,target:path,kind:m.t==='d'?'folder':'file',c:0,r:0}),'Shortcut added to desktop')},
+  addApp(app){if(items.some(x=>x.kind==='app'&&x.path===app))return RZ.toast('Already on the desktop');put(mk({name:APPS[app].name,target:app,kind:'app',c:0,r:0}),'Added to desktop')},
+  dropApp(id){items=items.filter(x=>!(x.kind==='app'&&x.path===id));write()}}})();
 /* ---------- register ---------- */
 Object.assign(APPS.files,{name:'My Files',icon:'folder',w:900,h:560,render:renderFiles,ctx:(e,w)=>w.fm?w.fm.menu(e):null});
 APPS.editor={name:'Text Editor',icon:'editor',w:880,h:560,render:renderEditor};
