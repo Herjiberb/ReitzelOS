@@ -1,9 +1,8 @@
 'use strict';
 /* apps/keys.js — every global keyboard shortcut in one place.
-   Super tap ............ Start            Super+V / Ctrl+Alt+V .. Clipboard history
-   Super+E .............. My Files         Super+I ............... Settings
-   Ctrl+Alt+L ........... Lock             Ctrl+Alt+T ............ Terminal
-   Ctrl+Alt+Space ....... Start (works everywhere, incl. macOS)
+   Ctrl+Alt+Space ... Start      Ctrl+Alt+T ... Terminal    Ctrl+Alt+F ... My Files
+   Ctrl+Alt+S ....... Settings   Ctrl+Alt+L ... Lock        Ctrl+Alt+V ... Clipboard history
+   Tapping the Super key on its own also opens Start (no Super+key combos).
    Keys used by the clipboard panel itself (arrows, Enter, Delete, Esc) stay in apps/clipboard.js. */
 (()=>{
 const MAC=/Mac|iPhone|iPad/.test(navigator.platform||'');
@@ -11,23 +10,17 @@ const on=k=>S[k]!==false;
 const unlocked=()=>{const l=document.getElementById('lock');return !l||l.classList.contains('hide')};
 const startToggle=()=>(window.toggleStartX||toggleStart0)();
 const eat=e=>{e.preventDefault();e.stopImmediatePropagation()};
-const clip=()=>window.Clip&&Clip.open();
 
-/* shortcuts that work on every platform */
-const ANY=[
- [e=>e.ctrlKey&&e.altKey&&!e.shiftKey&&e.code==='KeyV',clip],
- [e=>e.ctrlKey&&e.altKey&&!e.shiftKey&&e.code==='KeyT',()=>openApp('terminal')],
- [e=>e.ctrlKey&&e.altKey&&!e.shiftKey&&e.code==='Space'&&on('superKey'),startToggle],
- [e=>e.ctrlKey&&e.altKey&&!e.shiftKey&&e.code==='KeyL',()=>lockNow()]];
-/* Super (Windows) key combos */
-const SUPER={KeyV:clip,KeyE:()=>openApp('files'),KeyI:()=>openApp('settings')};
+/* Ctrl+Alt+<key>; matched by physical key so keyboard layout does not matter */
+const CA={Space:startToggle,KeyT:()=>openApp('terminal'),KeyF:()=>openApp('files'),KeyS:()=>openApp('settings'),KeyL:()=>lockNow(),KeyV:()=>window.Clip&&Clip.open()};
 
 let md=false,combo=false;
 addEventListener('keydown',e=>{if(!unlocked())return;
- for(const[t,fn]of ANY)if(t(e)){eat(e);fn();return}
+ if(e.ctrlKey&&e.altKey&&!e.shiftKey&&!e.metaKey){const fn=CA[e.code];if(fn){eat(e);fn();return}}
  if(MAC||!on('superKey'))return;
  if(e.key==='Meta'){if(!e.repeat){md=true;combo=false}return}
- if(md||e.metaKey){combo=true;const fn=SUPER[e.code];if(fn){eat(e);fn()}}},true);
+ if(md||e.metaKey)combo=true},true);
+/* a lone Super tap opens Start */
 addEventListener('keyup',e=>{if(e.key!=='Meta')return;const tap=md&&!combo;md=false;combo=false;if(tap&&!MAC&&on('superKey')&&unlocked())startToggle()},true);
 addEventListener('pointerdown',()=>{if(md)combo=true},true);
 addEventListener('blur',()=>{md=false;combo=false});
