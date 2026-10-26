@@ -262,7 +262,9 @@ addEventListener('mousedown',e=>{if(e.button===1)e.preventDefault()});
 /* ---------- boot ---------- */
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch{}
-(async()=>{let s;try{DB=await idb();for(const wait of[0,150,350,700,1200,2000]){if(wait)await new Promise(r=>setTimeout(r,wait));s=await load();if(s)break}
+(async()=>{/* os.js runs before the app scripts (fs.js, shortcuts.js ...): wait until every script has executed, otherwise boot can race ahead and hit "FS is not defined" */
+ await new Promise(r=>document.readyState==='complete'?r():addEventListener('load',()=>r(),{once:true}));
+ let s;try{DB=await idb();for(const wait of[0,150,350,700,1200,2000]){if(wait)await new Promise(r=>setTimeout(r,wait));s=await load();if(s)break}
   if(!s&&hasSeen()){
    /* this browser has real saved data, but IndexedDB didn't return it in time (almost always a reload racing an unfinished write from the previous page).
       Showing nothing and falling through to defaults would then get SAVED OVER the real data — so instead, wait longer and keep trying rather than ever booting into (and persisting) a blank profile. */
