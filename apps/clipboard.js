@@ -1,10 +1,9 @@
 'use strict';
-/* apps/clipboard.js — Super key shortcuts + clipboard history.
+/* apps/clipboard.js — clipboard history (shortcuts that open it live in apps/keys.js).
    History lives in <home>/.config/clipboard.syst so it survives reloads and is private to each profile.
    Unpinned entries: newest 20 from the last 24 hours. Pinned entries stay until removed. */
 (()=>{
 const FILE='clipboard.syst',MAXN=20,MAXAGE=864e5,MAXLEN=200000,MAXPIN=100;
-const MAC=/Mac|iPhone|iPad/.test(navigator.platform||'');
 const on=k=>S[k]!==false;
 let items=[],loadedFor=null,chain=Promise.resolve(),wt=0,lastEd=null,panel=null,sel=0,internal=0;
 const unlocked=()=>{const l=document.getElementById('lock');return !l||l.classList.contains('hide')};
@@ -57,31 +56,11 @@ const clear=all=>{items=all?[]:items.filter(i=>i.p);save();panel&&draw()};
 window.Clip={open,close,clear,toggle:open};
 new MutationObserver(()=>{if(panel&&!panel.isConnected)panel=null}).observe(pop,{childList:true});
 
-/* ---------- Super key + shortcuts ---------- */
-let md=false,combo=false;
-const startToggle=()=>(window.toggleStartX||toggleStart0)();
+/* ---------- keys while the panel is open ---------- */
 addEventListener('keydown',e=>{if(!unlocked())return;
  if(panel&&!e.ctrlKey&&!e.metaKey&&!e.altKey){const vis=items.length;if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();close();return}
   if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();e.stopImmediatePropagation();sel=(sel+(e.key==='ArrowDown'?1:-1)+vis)%Math.max(1,vis);draw();return}
   if(e.key==='Enter'&&vis){e.preventDefault();e.stopImmediatePropagation();const v=items.slice().sort((a,b)=>(b.p-a.p)||(b.t-a.t))[sel];v&&insert(v.x);return}
   if(e.key==='Delete'&&vis){e.preventDefault();e.stopImmediatePropagation();const v=items.slice().sort((a,b)=>(b.p-a.p)||(b.t-a.t))[sel];items=items.filter(x=>x!==v);save();draw();return}}
- /* fallbacks that work everywhere (including macOS, where Cmd is the normal shortcut key) */
- if(e.ctrlKey&&e.altKey&&e.code==='KeyV'){e.preventDefault();e.stopImmediatePropagation();open();return}
- if(e.ctrlKey&&e.altKey&&!e.shiftKey&&e.code==='KeyT'){e.preventDefault();e.stopImmediatePropagation();openApp('terminal');return}
- if(e.ctrlKey&&e.code==='Escape'&&on('superKey')){e.preventDefault();startToggle();return}
- if(MAC||!on('superKey'))return;
- if(e.key==='Meta'){if(!e.repeat){md=true;combo=false}return}
- if(md||e.metaKey){combo=true;const k=e.code;
-  if(k==='KeyV'){e.preventDefault();e.stopImmediatePropagation();open()}
-  else if(k==='KeyE'){e.preventDefault();openApp('files')}
-  else if(k==='KeyI'){e.preventDefault();openApp('settings')}
-  else if(k==='KeyL'){e.preventDefault();lockNow()}}},true);
-addEventListener('keyup',e=>{if(e.key!=='Meta')return;const tap=md&&!combo;md=false;combo=false;if(tap&&!MAC&&on('superKey')&&unlocked())startToggle()},true);
-addEventListener('pointerdown',()=>{if(md)combo=true},true);
-addEventListener('blur',()=>{md=false;combo=false});
-
-/* ---------- capture the Super key at OS level (Chromium, fullscreen only) ---------- */
-const kl=()=>{try{if(!navigator.keyboard)return;if(on('superKey')&&document.fullscreenElement)navigator.keyboard.lock(['MetaLeft','MetaRight']);else navigator.keyboard.unlock()}catch{}};
-document.addEventListener('fullscreenchange',kl);
-window.captureSuper=async()=>{try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen();kl();RZ.toast(navigator.keyboard&&navigator.keyboard.lock?'Super key captured while fullscreen':'This browser cannot capture the Super key')}catch{RZ.toast('Could not enter fullscreen')}};
+},true);
 })();
