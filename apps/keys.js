@@ -2,8 +2,8 @@
 /* apps/keys.js — every global keyboard shortcut in one place.
    Super tap ............ Start            Super+V / Ctrl+Alt+V .. Clipboard history
    Super+E .............. My Files         Super+I ............... Settings
-   Super+L .............. Lock             Ctrl+Alt+T ............ Terminal
-   Ctrl+Esc ............. Start (works everywhere, incl. macOS)
+   Ctrl+Alt+L ........... Lock             Ctrl+Alt+T ............ Terminal
+   Ctrl+Alt+Space ....... Start (works everywhere, incl. macOS)
    Keys used by the clipboard panel itself (arrows, Enter, Delete, Esc) stay in apps/clipboard.js. */
 (()=>{
 const MAC=/Mac|iPhone|iPad/.test(navigator.platform||'');
@@ -17,9 +17,10 @@ const clip=()=>window.Clip&&Clip.open();
 const ANY=[
  [e=>e.ctrlKey&&e.altKey&&!e.shiftKey&&e.code==='KeyV',clip],
  [e=>e.ctrlKey&&e.altKey&&!e.shiftKey&&e.code==='KeyT',()=>openApp('terminal')],
- [e=>e.ctrlKey&&!e.altKey&&!e.shiftKey&&e.code==='Escape'&&on('superKey'),startToggle]];
+ [e=>e.ctrlKey&&e.altKey&&!e.shiftKey&&e.code==='Space'&&on('superKey'),startToggle],
+ [e=>e.ctrlKey&&e.altKey&&!e.shiftKey&&e.code==='KeyL',()=>lockNow()]];
 /* Super (Windows) key combos */
-const SUPER={KeyV:clip,KeyE:()=>openApp('files'),KeyI:()=>openApp('settings'),KeyL:()=>lockNow()};
+const SUPER={KeyV:clip,KeyE:()=>openApp('files'),KeyI:()=>openApp('settings')};
 
 let md=false,combo=false;
 addEventListener('keydown',e=>{if(!unlocked())return;
