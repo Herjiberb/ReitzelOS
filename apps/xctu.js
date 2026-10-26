@@ -94,7 +94,7 @@ const Xctu=(()=>{
  let mp=Promise.resolve();const mountAll=()=>mp=mountAll_();
  async function mountAll_(){MOUNTED.forEach(i=>{if(!WIN_TEMP.has(i)){delete APPS[i]}});MOUNTED.clear();
   for(const r of await rec()){try{const pk=await parse(new Blob([r.buf]));if(pk.issues.length)continue;mount(pk,r.grants,false)}catch(e){console.warn('xctu: could not load',r.id,e)}}
-  typeof renderTB==='function'&&renderTB()}
+  typeof renderTB==='function'&&renderTB();try{typeof SC!=='undefined'&&SC.refresh()}catch{}}
  const WIN_TEMP=new Set();
  const KILLSEQ=new Map();let kbuf='',kbT=0;
  addEventListener('keydown',e=>{if(!KILLSEQ.size)return;const k=e.key.toUpperCase();if(k.length!==1||!/[A-Z]/.test(k))return;const n=Date.now();if(n-kbT>2500)kbuf='';kbT=n;kbuf=(kbuf+k).slice(-16);for(const[aid,ph]of KILLSEQ)if(ph&&kbuf.endsWith(ph)){kbuf='';killByPhrase(aid);break}},true);
