@@ -69,7 +69,7 @@ function quickSettings(a){if($('.qs')){closePop();return}closePop();const p=H('d
 /* ---------- start menu ---------- */
 const SETS=['Personalization','Desktop','Taskbar','Start menu','Time','Profiles','Defaults','System'];
 function startX(focus){if($('#start'))return closePop();closePop();
- const st=g('startStyle'),sz=g('startSize'),p=H('div','pop st-'+st+' sz-'+sz+' ic-'+g('startIco')+(g('startNames')?'':' nn')+(g('startFoot')?'':' nf'),pop),bot=S.pos==='bottom';p.id='start';startPos(p);
+ const st=g('startStyle'),sz=g('startSize'),p=H('div','pop sx-'+st+' sz-'+sz+' ic-'+g('startIco')+(g('startNames')?'':' nn')+(g('startFoot')?'':' nf'),pop),bot=S.pos==='bottom';p.id='start';startPos(p);
  if(st==='full'){const A=area();Object.assign(p.style,{left:A.x+'px',top:A.y+'px',width:A.w+'px',height:A.h+'px',margin:'0',bottom:'auto',right:'auto',maxWidth:'none',maxHeight:'none',borderRadius:'0'})}
  else{const w=({small:[460,520],medium:[560,640],large:[700,780]}[sz]||[560,640])[st==='list'?1:0];p.style.width=w+'px';if(bot){if(g('startPos')==='edge'){p.style.left='10px';p.style.marginLeft='0'}else p.style.marginLeft=-w/2+'px'}}
  p.innerHTML='<input class=srch placeholder="Search apps and settings…" autocomplete=off spellcheck=false><div class=sbody></div><div class=foot></div>';
