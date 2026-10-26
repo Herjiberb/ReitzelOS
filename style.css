@@ -283,7 +283,7 @@ body.panel #tb.conn.left,body.panel #tb.conn.right{top:28px;height:calc(100% - 2
 body.panel #tb.left:not(.conn),body.panel #tb.right:not(.conn){top:calc(50% + 14px);height:calc(100% - 44px)}
 /* start menu styles */
 #start .sbody{overflow:auto;max-height:min(60vh,520px)}
-#start.st-grid.sz-small .grid,#start.st-win11.sz-small .grid{grid-template-columns:repeat(4,1fr)}#start.sz-large .grid{grid-template-columns:repeat(6,1fr)}
+#start.st-grid.sz-small .grid,#start.st-pinned.sz-small .grid{grid-template-columns:repeat(4,1fr)}#start.sz-large .grid{grid-template-columns:repeat(6,1fr)}
 .sh{display:flex;align-items:center;font-weight:600;font-size:13px;margin:10px 4px 4px}.sh .btn{margin-left:auto;padding:2px 10px;font-size:12px}
 .srow{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;width:100%;text-align:left}.srow:hover{background:#ffffff1a}.srow img{width:24px;height:24px}
 .lt{padding:8px 10px 2px;font-size:12px;font-weight:700;opacity:.65}
@@ -295,3 +295,36 @@ body.panel #tb.left:not(.conn),body.panel #tb.right:not(.conn){top:calc(50% + 14
 .cal .cg{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;font-size:12px}.cal .cg span{padding:6px 0;border-radius:999px}.cal .cg .w{opacity:.55;font-weight:700}.cal .cg .o{opacity:.3}.cal .cg .t{background:linear-gradient(135deg,var(--a),var(--b));font-weight:700}
 .qs{width:320px;padding:14px}.qs .qg{display:grid;grid-template-columns:1fr 1fr;gap:8px}.qs .qt{padding:12px;border-radius:12px;background:#ffffff14;text-align:left;font-size:12px}.qs .qt.on{background:linear-gradient(135deg,var(--a),var(--b))}
 .qs .qf{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+
+/* --- taskbar status marks, labels, huge icons --- */
+.tbb{overflow:visible}.tbb.run::after{bottom:3px}
+body.tbl #tb:not(.left):not(.right) .tbb[data-app]:has(.tl){padding:0 14px 0 12px;gap:8px;max-width:190px}
+body.tbl #tb:not(.left):not(.right) .tbb[data-app] .tl{max-width:120px;font-size:12.5px;opacity:.92}
+body.tbl #tb:not(.left):not(.right) .tbb.run:has(.tl)::after{left:34%;right:34%;width:auto;bottom:3px;transform:none}
+body.tbl #tb:not(.left):not(.right) .tbb.act:has(.tl)::after{left:12px;right:12px}
+body.tbl #tb:not(.left):not(.right) .tbb.multi:has(.tl)::after{left:22%;right:22%;background:linear-gradient(90deg,var(--c) 0 42%,transparent 42% 58%,var(--c) 58%)}
+body.tbl #tb:not(.left):not(.right) .tbb.multi.act:has(.tl)::after{left:12px;right:12px;background:linear-gradient(90deg,var(--b) 0 46%,transparent 46% 54%,var(--b) 54%)}
+body.ind-none .tbb::after{display:none!important}
+body.ind-dot .tbb.run::after,body.ind-dot .tbb.act::after,body.ind-dot .tbb.multi::after{width:5px!important;height:5px!important;border-radius:50%;background:var(--c)!important}
+body.ind-dot .tbb.act::after{background:var(--b)!important;box-shadow:0 0 6px var(--b)}
+body.ind-glow .tbb.run::after{width:60%!important;height:2px!important;background:var(--c)!important;box-shadow:0 0 8px 2px var(--c)}
+body.ind-glow .tbb.act::after{background:var(--b)!important;box-shadow:0 0 10px 3px var(--b)}
+#tb.left .tbb.run::after,#tb.right .tbb.run::after{bottom:auto}
+body.noclk #tb .clk{display:none}
+/* --- start menu: normal search bar, no ugly scrollbar --- */
+#start .srch{border-radius:8px;padding:10px 14px;background:#ffffff14;border:1px solid #ffffff22;position:sticky;top:0;flex:none;margin-bottom:2px}
+#start.st-full .srch{max-width:560px}
+#start .sbody,#start .al,#start .tiles{scrollbar-width:none;-ms-overflow-style:none}
+#start .sbody::-webkit-scrollbar,#start .al::-webkit-scrollbar,#start .tiles::-webkit-scrollbar{display:none;width:0;height:0}
+#start.nn .gi{font-size:0}#start.nn .gi img{margin:0}
+#start.ic-small .gi img{width:30px;height:30px}#start.ic-large .gi img{width:56px;height:56px}
+#start.nf .foot{display:none}
+/* start menu grid: vertical scrolling only */
+#start .sbody{overflow-y:auto;overflow-x:hidden}
+#start .grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+#start.sz-large .grid{grid-template-columns:repeat(6,minmax(0,1fr))}
+#start.st-grid.sz-small .grid,#start.st-pinned.sz-small .grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+#start.st-list .grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+#start.st-full .grid{grid-template-columns:repeat(8,minmax(0,1fr))}
+#start .gi{min-width:0;overflow:hidden;text-align:center}
+#start .gi{text-overflow:ellipsis;white-space:nowrap}
